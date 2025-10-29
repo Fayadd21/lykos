@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "lykos"
+version = "1.0.0"
+description = "Lykos, the Open-Source Werewolf bot - an IRC bot for playing Werewolf/Mafia games"
+authors = ["Fayadd21 <dawoodfayad46@gmail.com>"]
+license = "BSD-2-clause"
+readme = "README.md"
+
+packages = [
+    { include = "src" },
+    { include = "oyoyo" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+antlr4-python3-runtime = ">=4.8.0,<4.9.0"
+ruamel-yaml = ">=0.16.0,<1.0.0"
+requests = ">=2.24.0,<3.0.0"
+cryptography = ">=38.0.4"
+
+[tool.poetry.scripts]
+lykos-bot = "wolfbot:main"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+

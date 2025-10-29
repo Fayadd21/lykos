@@ -35,18 +35,24 @@ try: # need to manually add dependencies here
     import requests
     import ruamel.yaml
 except ImportError:
-    print("\n".join(["*** Missing dependencies! ***".center(80),
-                     "Please install the missing dependencies by running the following command:",
-                     "{0} -m pip install --user -r requirements.txt".format(sys.executable),
-                     "",
-                     "If you don't have pip and don't know how to install it, follow this link:",
-                     "https://pip.pypa.io/en/stable/installing/",
-                     "",
-                     "If you need any further help with setting up and/or running the bot,",
-                     "  we will be happy to help you in #lykos on irc.libera.chat",
-                     "",
-                     "- The lykos developers"]), file=sys.stderr)
+    print("\n".join([
+        "*** Missing dependencies! ***".center(80),
+        "Please install the missing dependencies by running the following command:",
+        "",
+        "    poetry install",
+        "",
+        "This will automatically create a virtual environment and install all required packages",
+        "defined in pyproject.toml.",
+        "",
+        "If you don't have Poetry installed, visit:",
+        "https://python-poetry.org/docs/#installation",
+        "",
+        "If you need any further help with setting up and/or running the bot,",
+        "  we will be happy to help you in #lykos on irc.libera.chat",
+        "",
+        "- The lykos developers"]), file=sys.stderr)
     sys.exit(1)
+
 
 # Parse command line args
 # Argument --debug means start in debug mode (loads botconfig.debug.yml)

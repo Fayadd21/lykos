@@ -14,6 +14,54 @@ Werewolf is a popular party game, similar to and inspired by [mafia][mafia]. In 
 
 We run an instance of the bot in the [#werewolf channel][game_webchat] on Libera. Off-topic discussion happens in #werewolf-meta on the same network, and channel operators can be reached in #werewolf-ops. There are also other networks listed in the [Networks page][wikinet] of our [official wiki][wiki]. Keep in mind that, just because someone appears online, does not mean they are around or available to play.
 
+---
+
+## Build, Installation, and Setup (using Poetry)
+
+Lykos now uses [**Poetry**](https://python-poetry.org/) for dependency management, packaging, and builds.  
+
+### Requirements
+- Python **3.11 or higher**
+- [Poetry](https://python-poetry.org/docs/#installation)
+
+### 1. Clone and enter the project
+```bash
+git clone https://github.com/lykoss/lykos.git
+cd lykos
+```
+
+### 2. Install dependencies
+```bash
+poetry install
+```
+
+This creates a virtual environment and installs all dependencies defined in `pyproject.toml`.
+
+### 3. Run the bot
+You can now launch Lykos using Poetry:
+```bash
+poetry run lykos-bot
+```
+Or manually:
+```bash
+poetry run python src/wolfbot.py
+```
+
+### 5. (Optional) Build a package
+To build a distributable package (wheel and tarball):
+```bash
+poetry build
+```
+
+Artifacts will appear in the `dist/` folder:
+```
+dist/
+├── lykos-1.0.0-py3-none-any.whl
+└── lykos-1.0.0.tar.gz
+```
+
+---
+
 ## For players
 
 ### I've never played such a game before. How do I play?
@@ -27,6 +75,8 @@ The bot contains over 50 roles, so it can take a while to get used to all of the
 ### As a player, what commands can I use?
 
 Lykos has a host of commands which can be used for various purposes. [You can view them on our wiki.](https://werewolf.chat/Commands)
+
+---
 
 ## For bot operators
 
@@ -75,7 +125,13 @@ Let us know! We will do the best we can to accomodate third-party roles and mode
 
 ### Additional information for bot operators
 
-You can run the bot by doing `./wolfbot.py` on Linux, or simply double-clicking the `wolfbot.py` file on Windows.
+You can run the bot by doing `./wolfbot.py` on Linux, or simply double-clicking the `wolfbot.py` file on Windows.  
+Alternatively, if using Poetry, you can now do:
+```bash
+poetry run lykos-bot
+```
+
+---
 
 ## Credits
 
@@ -96,6 +152,8 @@ Everyone who opened issues in our bug tracker.
 And, of course, to all the bot owners and players who kept this project alive all this time!
 
 Special thanks to LaneAtomic for their work on the messages system, which made coding future features a lot easier.
+
+---
 
 [mafia]: https://en.wikipedia.org/wiki/Mafia_(party_game)
 [license]: https://github.com/lykoss/lykos/blob/master/LICENSE
