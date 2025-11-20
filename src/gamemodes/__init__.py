@@ -1,41 +1,59 @@
 from __future__ import annotations
 
-import os.path
 import glob
 import importlib
+import os.path
 from typing import Optional, Type
-from src.messages import messages
+
+from src.cats import (
+    All,
+    Cursed,
+    Hidden,
+    Innocent,
+    Killer,
+    Neutral,
+    Nobody,
+    Nocturnal,
+    Spy,
+    Team_Switcher,
+    Vampire,
+    Village,
+    Win_Stealer,
+    Wolf,
+    Wolfchat,
+)
 from src.events import Event, EventListener
-from src.users import User
-from src.cats import (All, Cursed, Wolf, Wolfchat, Innocent, Village, Neutral, Hidden, Team_Switcher,
-                      Win_Stealer, Nocturnal, Killer, Vampire, Spy, Nobody)
 from src.gamestate import GameState
+from src.messages import messages
+from src.users import User
 
 __all__ = ["InvalidModeException", "game_mode", "import_builtin_modes", "GameMode", "GAME_MODES"]
 
+
 class InvalidModeException(Exception):
     pass
+
 
 class CustomSettings:
     def __init__(self):
         self._overridden: set[str] = set()
         self._customized: set[str] = set()
-        self._abstain_enabled: Optional[bool] = None
-        self._limit_abstain: Optional[bool] = None
+        self._abstain_enabled: bool | None = None
+        self._limit_abstain: bool | None = None
         self.self_vote_allowed: bool = True
         self.default_role: str = "villager"
         self.hidden_role: str = "villager"
         self.start_with_day: bool = False
         self.always_pm_role: bool = False
-        self._role_reveal: Optional[str] = None # on/off/team
-        self._stats_type: Optional[str] = None # default/accurate/team/disabled
+        self._role_reveal: str | None = None  # on/off/team
+        self._stats_type: str | None = None  # default/accurate/team/disabled
 
-        self._day_time_limit: Optional[int] = None
-        self._day_time_warn: Optional[int] = None
-        self._short_day_time_limit: Optional[int] = None
-        self._short_day_time_warn: Optional[int] = None
-        self._night_time_limit: Optional[int] = None
-        self._night_time_warn: Optional[int] = None
+        self._day_time_limit: int | None = None
+        self._day_time_warn: int | None = None
+        self._short_day_time_limit: int | None = None
+        self._short_day_time_warn: int | None = None
+        self._night_time_limit: int | None = None
+        self._night_time_warn: int | None = None
 
     def add_override(self, *args: str) -> None:
         """
@@ -166,6 +184,7 @@ class CustomSettings:
     def night_time_warn(self, value: int):
         self._night_time_warn = value
 
+
 def import_builtin_modes():
     path = os.path.dirname(os.path.abspath(__file__))
     search = os.path.join(path, "*.py")
@@ -176,6 +195,7 @@ def import_builtin_modes():
         if f.startswith("_"):
             continue
         importlib.import_module("." + n, package="src.gamemodes")
+
 
 class GameMode:
     name: str
@@ -199,13 +219,25 @@ class GameMode:
             self.SECONDARY_ROLES["gunner"] = Village + Neutral + Hidden - Innocent - Team_Switcher
 
         if "sharpshooter" in All:
-            self.SECONDARY_ROLES["sharpshooter"] = Village + Neutral + Hidden - Innocent - Team_Switcher
+            self.SECONDARY_ROLES["sharpshooter"] = (
+                Village + Neutral + Hidden - Innocent - Team_Switcher
+            )
 
         if "mayor" in All:
             self.SECONDARY_ROLES["mayor"] = All - Innocent - Win_Stealer
 
         if "assassin" in All:
-            self.SECONDARY_ROLES["assassin"] = All - Nocturnal + Killer - Spy + Wolfchat - Wolf - Vampire - Innocent - Team_Switcher
+            self.SECONDARY_ROLES["assassin"] = (
+                All
+                - Nocturnal
+                + Killer
+                - Spy
+                + Wolfchat
+                - Wolf
+                - Vampire
+                - Innocent
+                - Team_Switcher
+            )
             if "traitor" in All:
                 self.SECONDARY_ROLES["assassin"] -= {"traitor"}
 
@@ -232,11 +264,11 @@ class GameMode:
             if chances.keys() != shamans:
                 for role in shamans:
                     if role not in chances:
-                        chances[role] = 0 # default to 0 for new totems/shamans
+                        chances[role] = 0  # default to 0 for new totems/shamans
 
         for role in shamans:
             if role not in self.NUM_TOTEMS:
-                self.NUM_TOTEMS[role] = 1 # shamans get 1 totem per night by default
+                self.NUM_TOTEMS[role] = 1  # shamans get 1 totem per night by default
 
         if not arg:
             return
@@ -303,9 +335,12 @@ class GameMode:
 
     def set_default_totem_chances(self):
         if self.TOTEM_CHANCES is self.DEFAULT_TOTEM_CHANCES:
-            return # nothing more we can do
+            return  # nothing more we can do
         for totem, chances in self.TOTEM_CHANCES.items():
-            if totem not in self.DEFAULT_TOTEM_CHANCES or self.DEFAULT_TOTEM_CHANCES[totem].keys() == chances.keys():
+            if (
+                totem not in self.DEFAULT_TOTEM_CHANCES
+                or self.DEFAULT_TOTEM_CHANCES[totem].keys() == chances.keys()
+            ):
                 continue
             for role, value in self.DEFAULT_TOTEM_CHANCES[totem].items():
                 if role not in chances:
@@ -313,14 +348,17 @@ class GameMode:
 
     # Here so any game mode can use it
     # FIXME: lovers should be a status or something more generic so we don't need to import matchmaker here
-    def lovers_chk_win(self, evt: Event, var: GameState, rolemap, mainroles, lpl, lwolves, lrealwolves, lvampires):
+    def lovers_chk_win(
+        self, evt: Event, var: GameState, rolemap, mainroles, lpl, lwolves, lrealwolves, lvampires
+    ):
         winner = evt.data["winner"]
         if winner in Win_Stealer:
-            return # fool won, lovers can't win even if they would
-        from src.roles.matchmaker import get_all_lovers, Lovers
-        all_lovers = get_all_lovers(var) # type: ignore
+            return  # fool won, lovers can't win even if they would
+        from src.roles.matchmaker import Lovers, get_all_lovers
+
+        all_lovers = get_all_lovers(var)  # type: ignore
         if len(all_lovers) != 1:
-            return # we need exactly one cluster alive for this to trigger
+            return  # we need exactly one cluster alive for this to trigger
 
         lovers = all_lovers[0]
 
@@ -328,7 +366,9 @@ class GameMode:
             evt.data["winner"] = Lovers
             evt.data["message"] = messages["lovers_win"]
 
-    def all_dead_chk_win(self, evt: Event, var: GameState, rolemap, mainroles, lpl, lwolves, lrealwolves, lvampires):
+    def all_dead_chk_win(
+        self, evt: Event, var: GameState, rolemap, mainroles, lpl, lwolves, lrealwolves, lvampires
+    ):
         if evt.data["winner"] is Nobody:
             evt.data["winner"] = All
             evt.data["message"] = messages["everyone_died_won"]
@@ -338,11 +378,14 @@ class GameMode:
             for key, value in self.GUN_CHANCES[role].items():
                 evt.data[key] += value
 
-GAME_MODES: dict[str, tuple[Type[GameMode], int, int]] = {}
+
+GAME_MODES: dict[str, tuple[type[GameMode], int, int]] = {}
+
 
 def game_mode(name: str, minp: int, maxp: int):
-    def decor(c: Type[GameMode]):
+    def decor(c: type[GameMode]):
         c.name = name
         GAME_MODES[name] = (c, minp, maxp)
         return c
+
     return decor

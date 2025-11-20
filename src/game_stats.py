@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional
 
+from src import channels, config, db, users
+from src.decorators import command
+from src.dispatcher import MessageDispatcher
 from src.functions import match_mode, match_role
 from src.messages import messages
-from src.decorators import command
-from src import channels, users, config, db
-from src.dispatcher import MessageDispatcher
 
-LAST_GSTATS: Optional[datetime] = None
-LAST_PSTATS: Optional[datetime] = None
-LAST_RSTATS: Optional[datetime] = None
+LAST_GSTATS: datetime | None = None
+LAST_PSTATS: datetime | None = None
+LAST_RSTATS: datetime | None = None
+
 
 @command("gamestats", pm=True)
 def game_stats(wrapper: MessageDispatcher, message: str):
@@ -19,8 +19,12 @@ def game_stats(wrapper: MessageDispatcher, message: str):
     # NOTE: Need to dynamically translate roles and gamemodes
     if wrapper.public:
         global LAST_GSTATS
-        if (LAST_GSTATS and config.Main.get("ratelimits.gamestats", 0) and
-            LAST_GSTATS + timedelta(seconds=config.Main.get("ratelimits.gamestats")) > datetime.now()):
+        if (
+            LAST_GSTATS
+            and config.Main.get("ratelimits.gamestats", 0)
+            and LAST_GSTATS + timedelta(seconds=config.Main.get("ratelimits.gamestats"))
+            > datetime.now()
+        ):
             wrapper.pm(messages["command_ratelimited"])
             return
 
@@ -58,14 +62,19 @@ def game_stats(wrapper: MessageDispatcher, message: str):
         # Attempt to find game stats for the given game size
         wrapper.send(db.get_game_stats(gamemode, gamesize))
 
+
 @command("playerstats", pm=True)
 def player_stats(wrapper: MessageDispatcher, message: str):
     """Gets the stats for the given player and role or a list of role totals if no role is given."""
     # NOTE: Need to dynamically translate gamemodes
     if wrapper.public:
         global LAST_PSTATS
-        if (LAST_PSTATS and config.Main.get("ratelimits.playerstats", 0) and
-            LAST_PSTATS + timedelta(seconds=config.Main.get("ratelimits.playerstats")) > datetime.now()):
+        if (
+            LAST_PSTATS
+            and config.Main.get("ratelimits.playerstats", 0)
+            and LAST_PSTATS + timedelta(seconds=config.Main.get("ratelimits.playerstats"))
+            > datetime.now()
+        ):
             wrapper.pm(messages["command_ratelimited"])
             return
 
@@ -119,23 +128,28 @@ def player_stats(wrapper: MessageDispatcher, message: str):
         role = matches.get().key
         wrapper.send(db.get_player_stats(account, role))
 
+
 @command("mystats", pm=True)
 def my_stats(wrapper: MessageDispatcher, message: str):
     """Get your own stats."""
     msg = message.split()
     player_stats.func(wrapper, " ".join([wrapper.source.nick] + msg))
 
+
 @command("rolestats", pm=True)
 def role_stats(wrapper: MessageDispatcher, message: str):
     """Gets the stats for a given role in a given gamemode or lists role totals across all games if no role is given."""
     if wrapper.public:
         global LAST_RSTATS
-        if (LAST_RSTATS and config.Main.get("ratelimits.rolestats", 0) and
-            LAST_RSTATS + timedelta(seconds=config.Main.get("ratelimits.rolestats")) > datetime.now()):
+        if (
+            LAST_RSTATS
+            and config.Main.get("ratelimits.rolestats", 0)
+            and LAST_RSTATS + timedelta(seconds=config.Main.get("ratelimits.rolestats"))
+            > datetime.now()
+        ):
             wrapper.pm(messages["command_ratelimited"])
             return
 
-        
         if wrapper.game_state and wrapper.game_state.in_game and wrapper.target is channels.Main:
             wrapper.pm(messages["stats_wait_for_game_end"])
             return
@@ -143,7 +157,7 @@ def role_stats(wrapper: MessageDispatcher, message: str):
         LAST_RSTATS = datetime.now()
 
     params = message.split()
-    
+
     if not params:
         first, totals = db.get_role_totals()
         wrapper.pm(*totals, sep=", ", first=first)

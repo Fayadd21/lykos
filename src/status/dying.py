@@ -1,24 +1,33 @@
 from __future__ import annotations
 
+import logging
 import time
 from collections import Counter
-from typing import Optional, Tuple
 
+from src import channels, locks
 from src.containers import UserDict, UserSet
-from src.functions import get_main_role, get_all_roles, get_reveal_role
-from src.gamestate import GameState, PregameState
 from src.events import Event, event_listener
+from src.functions import get_all_roles, get_main_role, get_reveal_role
+from src.gamestate import GameState, PregameState
 from src.users import User
-from src import locks, channels
 
 __all__ = ["add_dying", "is_dying", "is_dead", "kill_players", "DEAD"]
 
-DyingEntry = Tuple[str, str, bool, Optional[User]]
+DyingEntry = tuple[str, str, bool, User | None]
 
 DYING: UserDict[User, DyingEntry] = UserDict()
 DEAD: UserSet = UserSet()
 
-def add_dying(var: GameState, player: User, killer_role: str, reason: str, *, death_triggers: bool = True, killer: Optional[User] = None) -> bool:
+
+def add_dying(
+    var: GameState,
+    player: User,
+    killer_role: str,
+    reason: str,
+    *,
+    death_triggers: bool = True,
+    killer: User | None = None,
+) -> bool:
     """
     Mark a player as dying.
 
@@ -34,16 +43,29 @@ def add_dying(var: GameState, player: User, killer_role: str, reason: str, *, de
 
     # ensure that the reaper thread doesn't smash things against the gameplay thread when running this
     # (eventually the reaper thread will just pass messages to the main thread via the asyncio event loop and these locks would therefore be unnecessary)
-    with locks.reaper: # FIXME
+    logger = logging.getLogger("game.dying")
+    with locks.reaper:  # FIXME
         if not var or var.game_id > t:
             #  either game ended, or a new game has started
+            logger.debug(
+                "add_dying skipped: game ended or new game started (game_id: {0})",
+                var.game_id if var else None,
+            )
             return False
 
         if player in DYING or player in DEAD:
+            logger.warning("Player {0} already dying/dead, cannot mark as dying again", player)
             return False
 
         DYING[player] = (killer_role, reason, death_triggers, killer)
+        logger.info(
+            "Marked player {0} as dying (killer_role: {1}, reason: {2})",
+            player,
+            killer_role,
+            reason,
+        )
         return True
+
 
 def is_dying(var: GameState, player: User) -> bool:
     """
@@ -55,6 +77,7 @@ def is_dying(var: GameState, player: User) -> bool:
     """
     return player in DYING
 
+
 def is_dead(var: GameState, player: User) -> bool:
     """
     Determine if the player is dead.
@@ -65,7 +88,8 @@ def is_dead(var: GameState, player: User) -> bool:
     """
     return player in DEAD
 
-def kill_players(var: Optional[GameState | PregameState], *, end_game: bool = True) -> bool:
+
+def kill_players(var: GameState | PregameState | None, *, end_game: bool = True) -> bool:
     """
     Kill all players marked as dying.
 
@@ -78,9 +102,15 @@ def kill_players(var: Optional[GameState | PregameState], *, end_game: bool = Tr
     """
     t = time.time()
 
-    with locks.reaper: # FIXME
+    logger = logging.getLogger("game.dying")
+    with locks.reaper:  # FIXME
         if not var or var.game_id > t:
             #  either game ended, or a new game has started
+            logger.error(
+                "kill_players called with invalid game state (var: {0}, game_id: {1})",
+                var is not None,
+                var.game_id if var else None,
+            )
             return True
 
         dead: set[User] = set()
@@ -109,12 +139,15 @@ def kill_players(var: Optional[GameState | PregameState], *, end_game: bool = Tr
                 channels.Main.mode(("-v", player.nick))
 
             # notify listeners that the player died for possibility of chained deaths
-            evt = Event("del_player", {},
-                        killer=killer,
-                        killer_role=killer_role,
-                        main_role=main_role,
-                        reveal_role=reveal_role,
-                        reason=reason)
+            evt = Event(
+                "del_player",
+                {},
+                killer=killer,
+                killer_role=killer_role,
+                main_role=main_role,
+                reveal_role=reveal_role,
+                reason=reason,
+            )
             evt_death_triggers = death_triggers and var.in_game
             evt.dispatch(var, player, all_roles, evt_death_triggers)
 
@@ -140,6 +173,7 @@ def kill_players(var: Optional[GameState | PregameState], *, end_game: bool = Tr
         evt = Event("kill_players", {}, end_game=end_game)
         return not evt.dispatch(var, dead)
 
+
 @event_listener("night_kills")
 def kill_off_dying_players(evt: Event, var: GameState):
     evt.data["victims"].update(DYING)
@@ -148,6 +182,7 @@ def kill_off_dying_players(evt: Event, var: GameState):
     evt.data["kill_priorities"]["@dying"] = -100
     for victim in DYING:
         evt.data["killers"][victim].append("@dying")
+
 
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):

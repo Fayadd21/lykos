@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
-from typing import Dict, Generic, Iterable, List, Set, TypeVar
+from collections.abc import Iterable
+from typing import Generic, TypeVar
 
 from src.users import User
 
@@ -38,6 +39,7 @@ files to get an idea of how those containers should be used.
 
 """
 
+
 class Container(ABC):
     """Base container class for all containers."""
 
@@ -49,11 +51,11 @@ class Container(ABC):
         # base class with it since that would lead to potentially forgotten tracking.
         # Instead the subclass should iterate over iterable and add each element to the parent container
         # with its own add/append/etc. method that implements proper user tracking.
-        super(Container, self).__init__()
+        super().__init__()
 
     def __iter__(self):
         # noinspection PyUnresolvedReferences
-        return super(Container, self).__iter__()
+        return super().__iter__()
 
     def __enter__(self):
         return self
@@ -63,7 +65,7 @@ class Container(ABC):
 
     def __format__(self, format_spec=""):
         args = [format(x, format_spec) for x in self]
-        return "{0}({1})".format(self.__class__.__name__, ", ".join(args))
+        return "{}({})".format(self.__class__.__name__, ", ".join(args))
 
     def __str__(self):
         return self.__format__()
@@ -83,9 +85,10 @@ class Container(ABC):
     @abstractmethod
     def clear(self):
         # noinspection PyUnresolvedReferences
-        super(Container, self).clear()
+        super().clear()
 
-class UserList(Container, List[User]):
+
+class UserList(Container, list[User]):
     def __init__(self, iterable=()):
         super().__init__()
         try:
@@ -124,7 +127,7 @@ class UserList(Container, List[User]):
 
         super().__delitem__(index)
 
-        if item not in self: # there may have been multiple instances
+        if item not in self:  # there may have been multiple instances
             item.lists.remove(self)
 
     def append(self, item):
@@ -172,7 +175,8 @@ class UserList(Container, List[User]):
         if item not in self:
             item.lists.remove(self)
 
-class UserSet(Container, Set[User]):
+
+class UserSet(Container, set[User]):
     def __init__(self, iterable=()):
         super().__init__()
         try:
@@ -185,7 +189,7 @@ class UserSet(Container, Set[User]):
     def __format__(self, format_spec=""):
         # sort the args so we have a stable result regardless of our hash key for unit testing
         args = sorted([format(x, format_spec) for x in self])
-        return "{0}({1})".format(self.__class__.__name__, ", ".join(args))
+        return "{}({})".format(self.__class__.__name__, ", ".join(args))
 
     # Operators are not overloaded - 'user_set & other_set' will return a regular set
     # This is a deliberate design decision. To get a UserSet out of them, use the named ones
@@ -283,7 +287,8 @@ class UserSet(Container, Set[User]):
             if item not in self:
                 self.add(item)
 
-class UserDict(Container, Dict[KT, VT], Generic[KT, VT]):
+
+class UserDict(Container, dict[KT, VT], Generic[KT, VT]):
     def __init__(self, _it=(), **kwargs):
         super().__init__()
         if hasattr(_it, "items"):
@@ -295,7 +300,7 @@ class UserDict(Container, Dict[KT, VT], Generic[KT, VT]):
                 self[key] = value
         except:
             while self:
-                self.popitem() # don't clear, as it's recursive (we might not want that)
+                self.popitem()  # don't clear, as it's recursive (we might not want that)
             raise
 
     def __format__(self, format_spec=""):
@@ -310,11 +315,11 @@ class UserDict(Container, Dict[KT, VT], Generic[KT, VT]):
                     args = ["{0}: {1:{2}}".format(x, y, format_spec) for x, y in self.items()]
         elif format_spec == "":
             # maintain a stable ordering for unit testing regardless of hash key
-            args = sorted(["{0}: {1}".format(x, y) for x, y in self.items()])
+            args = sorted([f"{x}: {y}" for x, y in self.items()])
         else:
             return super().__format__(format_spec)
 
-        return "{0}({1})".format(self.__class__.__name__, ", ".join(args))
+        return "{}({})".format(self.__class__.__name__, ", ".join(args))
 
     def __deepcopy__(self, memo):
         new = type(self)()
@@ -338,8 +343,8 @@ class UserDict(Container, Dict[KT, VT], Generic[KT, VT]):
                 value.dict_values.append(self)
 
     def __delitem__(self, item):
-        if isinstance(item, slice): # special-case: delete if it exists, otherwise don't
-            if item.start is item.step is None: # checks out
+        if isinstance(item, slice):  # special-case: delete if it exists, otherwise don't
+            if item.start is item.step is None:  # checks out
                 item = item.stop
                 if item not in self:
                     return
@@ -402,6 +407,7 @@ class UserDict(Container, Dict[KT, VT], Generic[KT, VT]):
             iterable = iterable.items()
         for key, value in iterable:
             self[key] = value
+
 
 class DefaultUserDict(UserDict[KT, VT], Generic[KT, VT]):
     def __init__(self, _factory, _it=(), **kwargs):

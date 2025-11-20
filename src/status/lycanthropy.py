@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from collections import Counter
 
+from src.cats import Category, Wolf
 from src.containers import UserDict
-from src.functions import get_players, get_main_role, change_role
-from src.messages import messages
 from src.events import Event, event_listener
-from src.cats import Wolf, Category
+from src.functions import change_role, get_main_role, get_players
 from src.gamestate import GameState
+from src.messages import messages
 from src.users import User
 
 __all__ = ["add_lycanthropy", "remove_lycanthropy", "add_lycanthropy_scope", "try_lycanthropy"]
@@ -35,6 +35,7 @@ SCOPE = set()
 #   By default, if this is not filled in, the bot will error.
 #   If a role is given that is not one of the possible roles specified in the metadata, the bot will error.
 
+
 def add_lycanthropy(var: GameState, target: User, prefix="lycan"):
     """Effect the target with lycanthropy. Fire the add_lycanthropy event."""
     if target in LYCANTHROPES or target not in get_players(var):
@@ -46,13 +47,16 @@ def add_lycanthropy(var: GameState, target: User, prefix="lycan"):
 
     return False
 
+
 def remove_lycanthropy(var: GameState, target: User):
     """Remove the lycanthropy effect from the target."""
     del LYCANTHROPES[:target:]
 
+
 def add_lycanthropy_scope(var: GameState, scope: Category | set[str]):
     """Add a scope for roles that can effect lycanthropy, for stats."""
     SCOPE.update(scope)
+
 
 def try_lycanthropy(var: GameState, target: User) -> bool:
     """Trigger lycanthropy on the target, if able."""
@@ -79,15 +83,17 @@ def try_lycanthropy(var: GameState, target: User) -> bool:
             prefix = evt.data[role]["prefix"]
         for sec_role in evt.data[role].get("secondary_roles", ()):
             var.roles[sec_role].add(target)
-            to_send = "{0}_notify".format(sec_role.replace(" ", "_"))
+            to_send = "{}_notify".format(sec_role.replace(" ", "_"))
             target.send(messages[to_send])
 
     change_role(var, target, role, new_role, message=prefix + "_turn")
     return True
 
+
 @event_listener("reconfigure_stats")
 def on_reconfigure_stats(evt: Event, var: GameState, roleset: Counter, reason: str):
     from src.roles.helper.wolves import get_wolfchat_roles
+
     if reason != "howl" or not SCOPE:
         return
 
@@ -117,19 +123,25 @@ def on_reconfigure_stats(evt: Event, var: GameState, roleset: Counter, reason: s
             rs[new_role] = rs.get(new_role, 0) + 1
             evt.data["new"].append(rs)
 
+
 @event_listener("del_player")
-def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool):
+def on_del_player(
+    evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool
+):
     remove_lycanthropy(var, player)
+
 
 @event_listener("revealroles")
 def on_revealroles(evt: Event, var: GameState):
     if LYCANTHROPES:
         evt.data["output"].append(messages["lycanthropy_revealroles"].format(LYCANTHROPES))
 
+
 @event_listener("transition_night_begin")
 def on_begin_day(evt: Event, var: GameState):
     LYCANTHROPES.clear()
     SCOPE.clear()
+
 
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):

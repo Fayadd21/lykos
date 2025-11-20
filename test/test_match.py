@@ -1,7 +1,9 @@
 from unittest import TestCase
-from src.match import Match, match_all, match_one
-from src.functions import match_role, match_mode, match_totem
+
 from src.cats import Wolf
+from src.functions import match_mode, match_role, match_totem
+from src.match import Match, match_all, match_one
+
 
 class TestMatch(TestCase):
     def __init__(self, methodName="runTest"):
@@ -67,10 +69,15 @@ class TestMatch(TestCase):
             self.assertFalse(match_role("crazedshaman"))
             self.assertFalse(match_role("wolfteam"))
         with self.subTest("removing spaces"):
-            self.assertEqual(match_role("crazed shaman", remove_spaces=True).get().key, "crazed shaman")
-            self.assertEqual(match_role("crazedshaman", remove_spaces=True).get().key, "crazed shaman")
+            self.assertEqual(
+                match_role("crazed shaman", remove_spaces=True).get().key, "crazed shaman"
+            )
+            self.assertEqual(
+                match_role("crazedshaman", remove_spaces=True).get().key, "crazed shaman"
+            )
         with self.subTest("allowing extra"):
             from src.messages import messages
+
             messages.cache.clear()
             messages.messages["_roles"]["unittest_extra"] = ["unittest extra", "unittest extras"]
             self.assertEqual(match_role("unittest", allow_extra=True).get().key, "unittest_extra")

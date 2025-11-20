@@ -1,21 +1,21 @@
 from __future__ import annotations
 
+import logging
 import time
 from datetime import datetime, timedelta
-from typing import Optional
 
+from src import channels, config, locks, users
+from src.containers import UserDict, UserSet
+from src.debug import handle_error
 from src.decorators import command
 from src.dispatcher import MessageDispatcher
-from src.containers import UserDict, UserSet
-from src.gamestate import GameState
+from src.events import Event, event_listener
 from src.functions import get_players, get_reveal_role
-from src.warnings import add_warning
+from src.gamestate import GameState
 from src.messages import messages
 from src.status import add_dying, kill_players
-from src.events import Event, event_listener
-from src.debug import handle_error
 from src.users import User
-from src import config, locks, users, channels
+from src.warnings import add_warning
 
 LAST_SAID_TIME = UserDict()
 DISCONNECTED: UserDict[User, tuple[datetime, str]] = UserDict()
@@ -24,9 +24,11 @@ IDLE_WARNED_PM = UserSet()
 DCED_LOSERS = UserSet()
 NIGHT_IDLED = UserSet()
 
+
 @handle_error
 def reaper(var: GameState, gameid: int):
     # check to see if idlers need to be killed.
+    logger = logging.getLogger("game.reaper")
     game_start_time = datetime.now()
     last_day_id = var.day_count
     num_night_iters = 0
@@ -66,7 +68,15 @@ def reaper(var: GameState, gameid: int):
                 revealrole = get_reveal_role(var, dcedplayer)
                 if not config.Main.get(f"reaper.{what}.enabled"):
                     continue
-                if datetime.now() - timeofdc <= timedelta(seconds=config.Main.get(f"reaper.{what}.grace")):
+                grace_seconds = config.Main.get(f"reaper.{what}.grace")
+                if grace_seconds is None:
+                    logger.warning(
+                        "Missing config reaper.{0}.grace, skipping disconnect check for {1}",
+                        what,
+                        dcedplayer,
+                    )
+                    continue
+                if datetime.now() - timeofdc <= timedelta(seconds=grace_seconds):
                     continue
                 # config used: reaper.quit.grace, reaper.quit.points, reaper.quit.expiration,
                 # reaper.part.grace, reaper.part.points, reaper.part.expiration,
@@ -74,55 +84,91 @@ def reaper(var: GameState, gameid: int):
                 # message keys used: quit_death, quit_death_no_reveal, quit_warning,
                 # part_death, part_death_no_reveal, part_warning
                 # account_death, account_death_no_reveal, account_warning
+                logger.info("Killing disconnected player {0} (reason: {1})", dcedplayer, what)
                 channels.Main.send(messages[f"{what}_death{reveal}"].format(dcedplayer, revealrole))
                 if config.Main.get("reaper.autowarn") and var.current_phase != "join":
-                    NIGHT_IDLED.discard(dcedplayer) # don't double-dip if they idled out night as well
-                    add_warning(dcedplayer,
-                                config.Main.get(f"reaper.{what}.points"),
-                                users.Bot,
-                                messages[f"{what}_warning"],
-                                expires=config.Main.get(f"reaper.{what}.expiration"))
+                    NIGHT_IDLED.discard(
+                        dcedplayer
+                    )  # don't double-dip if they idled out night as well
+                    add_warning(
+                        dcedplayer,
+                        config.Main.get(f"reaper.{what}.points"),
+                        users.Bot,
+                        messages[f"{what}_warning"],
+                        expires=config.Main.get(f"reaper.{what}.expiration"),
+                    )
                 if var.in_game:
                     DCED_LOSERS.add(dcedplayer)
-                add_dying(var, dcedplayer, "bot", what, death_triggers=False)
+                if not add_dying(var, dcedplayer, "bot", what, death_triggers=False):
+                    logger.error(
+                        "Failed to mark disconnected player {0} as dying (already dying/dead?)",
+                        dcedplayer,
+                    )
 
             if not skip and config.Main.get("reaper.idle.enabled"):  # only if enabled
-                to_warn:    set[User] = set()
+                to_warn: set[User] = set()
                 to_warn_pm: set[User] = set()
-                to_kill:    set[User] = set()
+                to_kill: set[User] = set()
                 for user in get_players(var):
                     if user.is_fake:
                         continue
                     lst = LAST_SAID_TIME.get(user, game_start_time)
                     tdiff = datetime.now() - lst
-                    if (config.Main.get("reaper.idle.warn.channel") and
-                            tdiff > timedelta(seconds=config.Main.get("reaper.idle.warn.channel")) and
-                            user not in IDLE_WARNED):
+                    if (
+                        config.Main.get("reaper.idle.warn.channel")
+                        and tdiff > timedelta(seconds=config.Main.get("reaper.idle.warn.channel"))
+                        and user not in IDLE_WARNED
+                    ):
                         to_warn.add(user)
                         IDLE_WARNED.add(user)
-                        LAST_SAID_TIME[user] = (datetime.now() - timedelta(seconds=config.Main.get("reaper.idle.warn.channel")))  # Give them a chance
-                    elif (config.Main.get("reaper.idle.warn.private") and
-                            tdiff > timedelta(seconds=config.Main.get("reaper.idle.warn.private")) and
-                            user not in IDLE_WARNED_PM):
+                        LAST_SAID_TIME[user] = datetime.now() - timedelta(
+                            seconds=config.Main.get("reaper.idle.warn.channel")
+                        )  # Give them a chance
+                    elif (
+                        config.Main.get("reaper.idle.warn.private")
+                        and tdiff > timedelta(seconds=config.Main.get("reaper.idle.warn.private"))
+                        and user not in IDLE_WARNED_PM
+                    ):
                         to_warn_pm.add(user)
                         IDLE_WARNED_PM.add(user)
-                        LAST_SAID_TIME[user] = (datetime.now() - timedelta(seconds=config.Main.get("reaper.idle.warn.private")))
-                    elif (config.Main.get("reaper.idle.grace") and
-                            tdiff > timedelta(seconds=config.Main.get("reaper.idle.grace")) and
-                            (not config.Main.get("reaper.idle.warn.channel") or user in IDLE_WARNED) and
-                            (not config.Main.get("reaper.idle.warn.private") or user in IDLE_WARNED_PM)):
+                        LAST_SAID_TIME[user] = datetime.now() - timedelta(
+                            seconds=config.Main.get("reaper.idle.warn.private")
+                        )
+                    elif (
+                        config.Main.get("reaper.idle.grace")
+                        and tdiff > timedelta(seconds=config.Main.get("reaper.idle.grace"))
+                        and (not config.Main.get("reaper.idle.warn.channel") or user in IDLE_WARNED)
+                        and (
+                            not config.Main.get("reaper.idle.warn.private")
+                            or user in IDLE_WARNED_PM
+                        )
+                    ):
                         to_kill.add(user)
-                    elif tdiff < timedelta(seconds=config.Main.get("reaper.idle.warn.channel")) and (user in IDLE_WARNED or user in IDLE_WARNED_PM):
+                    elif tdiff < timedelta(
+                        seconds=config.Main.get("reaper.idle.warn.channel")
+                    ) and (user in IDLE_WARNED or user in IDLE_WARNED_PM):
                         IDLE_WARNED.discard(user)  # player saved themselves from death
                         IDLE_WARNED_PM.discard(user)
                 for user in to_kill:
                     # keys used: idle_death, idle_death_no_reveal
-                    channels.Main.send(messages[f"idle_death{reveal}"].format(user, get_reveal_role(var, user)))
+                    channels.Main.send(
+                        messages[f"idle_death{reveal}"].format(user, get_reveal_role(var, user))
+                    )
                     if var.in_game:
                         DCED_LOSERS.add(user)
-                    if config.Main.get("reaper.autowarn") and config.Main.get("reaper.idle.enabled"):
-                        NIGHT_IDLED.discard(user) # don't double-dip if they idled out night as well
-                        add_warning(user, config.Main.get("reaper.idle.points"), users.Bot, messages["idle_warning"], expires=config.Main.get("reaper.idle.expiration"))
+                    if config.Main.get("reaper.autowarn") and config.Main.get(
+                        "reaper.idle.enabled"
+                    ):
+                        NIGHT_IDLED.discard(
+                            user
+                        )  # don't double-dip if they idled out night as well
+                        add_warning(
+                            user,
+                            config.Main.get("reaper.idle.points"),
+                            users.Bot,
+                            messages["idle_warning"],
+                            expires=config.Main.get("reaper.idle.expiration"),
+                        )
                     add_dying(var, user, "bot", "idle", death_triggers=False)
                 pl = get_players(var)
                 x = [a for a in to_warn if a in pl]
@@ -136,6 +182,7 @@ def reaper(var: GameState, gameid: int):
 
             kill_players(var)
 
+
 @command("")  # update last said
 def update_last_said(wrapper: MessageDispatcher, message: str):
     if wrapper.target is not channels.Main or wrapper.game_state is None:
@@ -147,13 +194,24 @@ def update_last_said(wrapper: MessageDispatcher, message: str):
     if wrapper.game_state.in_game:
         LAST_SAID_TIME[wrapper.source] = datetime.now()
 
-    if wrapper.private and wrapper.source in get_players(wrapper.game_state) and wrapper.source in IDLE_WARNED_PM:
+    if (
+        wrapper.private
+        and wrapper.source in get_players(wrapper.game_state)
+        and wrapper.source in IDLE_WARNED_PM
+    ):
         wrapper.pm(messages["privmsg_idle_warning"].format(channels.Main))
 
+
 @handle_error
-def return_to_village(var: GameState, target: User, *, show_message: bool, new_user: Optional[User] = None):
+def return_to_village(
+    var: GameState, target: User, *, show_message: bool, new_user: User | None = None
+):
+    logger = logging.getLogger("game.reaper")
+    logger.debug("Processing return_to_village for {0}", target)
+
     with locks.reaper:
         from src.trans import ORIGINAL_ACCOUNTS
+
         if channels.Main not in target.channels:
             # managed to leave the channel in between the time return_to_village was scheduled and called
             return
@@ -179,7 +237,9 @@ def return_to_village(var: GameState, target: User, *, show_message: bool, new_u
                 if target.nick == new_user.nick:
                     channels.Main.send(messages["player_return"].format(new_user))
                 else:
-                    channels.Main.send(messages["player_return_nickchange"].format(new_user, target))
+                    channels.Main.send(
+                        messages["player_return_nickchange"].format(new_user, target)
+                    )
         else:
             # this particular user doesn't exist in DISCONNECTED, but that doesn't
             # mean that they aren't dced. They may have rejoined as a different nick,
@@ -190,10 +250,14 @@ def return_to_village(var: GameState, target: User, *, show_message: bool, new_u
             if len(userlist) == 1:
                 return_to_village(var, userlist[0], show_message=show_message, new_user=target)
 
+
 @event_listener("del_player")
-def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool):
-    if var.in_game: # remove the player from variables if they're in there
+def on_del_player(
+    evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool
+):
+    if var.in_game:  # remove the player from variables if they're in there
         DISCONNECTED.pop(player, None)
+
 
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):
@@ -202,7 +266,13 @@ def on_reset(evt: Event, var: GameState):
         for player in NIGHT_IDLED:
             if player.is_fake:
                 continue
-            add_warning(player, config.Main.get("reaper.night_idle.points"), users.Bot, messages["night_idle_warning"], expires=config.Main.get("reaper.night_idle.expiration"))
+            add_warning(
+                player,
+                config.Main.get("reaper.night_idle.points"),
+                users.Bot,
+                messages["night_idle_warning"],
+                expires=config.Main.get("reaper.night_idle.expiration"),
+            )
 
     LAST_SAID_TIME.clear()
     DISCONNECTED.clear()

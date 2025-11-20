@@ -1,41 +1,56 @@
 from __future__ import annotations
 
 import base64
-import threading
-import subprocess
-import platform
-import time
 import functools
 import logging
+import platform
+import subprocess
 import sys
-from typing import Optional
+import threading
+import time
 
 from oyoyo.client import IRCClient
 from src import channels, config, context, decorators, users
-from src.messages import messages
-from src.functions import get_participants, get_all_roles, match_role
-from src.dispatcher import MessageDispatcher
-from src.decorators import handle_error, command, hook
-from src.context import Features
-from src.users import User
-from src.events import Event, EventListener
-from src.transport.irc import get_services
 from src.channels import Channel
+from src.context import Features
+from src.decorators import command, handle_error, hook
+from src.dispatcher import MessageDispatcher
+from src.events import Event, EventListener
+from src.functions import get_all_roles, get_participants, match_role
+from src.messages import messages
+from src.transport.irc import get_services
+from src.users import User
+
 
 @handle_error
 def on_privmsg(cli, rawnick, chan, msg, *, notice=False):
-    if notice and "!" not in rawnick or not rawnick: # server notice; we don't care about those
+    """Handles when someone sends a message (either in channel or private).
+
+    This gets called whenever the bot receives a message. It figures out
+    who sent it and where, then passes it to the command handler if it
+    looks like a command.
+
+    Args:
+        cli: The IRC client object
+        rawnick: The person who sent the message
+        chan: The channel name, or bot's nick if it's a PM
+        msg: The actual message text
+        notice: True if it's a notice instead of a regular message
+    """
+    if notice and "!" not in rawnick or not rawnick:  # server notice; we don't care about those
         return
 
-    _ignore_locals_ = False
-    if config.Main.get("telemetry.errors.user_data_level") == 0 or config.Main.get("telemetry.errors.channel_data_level") == 0:
-        _ignore_locals_ = True  # don't expose in tb if we're trying to anonymize stuff
+    if (
+        config.Main.get("telemetry.errors.user_data_level") == 0
+        or config.Main.get("telemetry.errors.channel_data_level") == 0
+    ):
+        pass  # don't expose in tb if we're trying to anonymize stuff
 
     user = users.get(rawnick, allow_none=True)
 
     ch = chan.lstrip("".join(Features["PREFIX"]))
 
-    if context.equals(chan, users.Bot.nick): # PM
+    if context.equals(chan, users.Bot.nick):  # PM
         target = users.Bot
     else:
         target = channels.get(ch, allow_none=True)
@@ -45,11 +60,17 @@ def on_privmsg(cli, rawnick, chan, msg, *, notice=False):
 
     wrapper = MessageDispatcher(user, target)
 
-    if wrapper.public and config.Main.get("transports[0].user.ignore.hidden") and not chan.startswith(tuple(Features["CHANTYPES"])):
+    if (
+        wrapper.public
+        and config.Main.get("transports[0].user.ignore.hidden")
+        and not chan.startswith(tuple(Features["CHANTYPES"]))
+    ):
         return
 
-    if (notice and ((wrapper.public and config.Main.get("transports[0].user.ignore.channel_notice")) or
-                    (wrapper.private and config.Main.get("transports[0].user.ignore.private_notice")))):
+    if notice and (
+        (wrapper.public and config.Main.get("transports[0].user.ignore.channel_notice"))
+        or (wrapper.private and config.Main.get("transports[0].user.ignore.private_notice"))
+    ):
         return  # not allowed in settings
 
     for fn in decorators.COMMANDS[""]:
@@ -66,12 +87,15 @@ def on_privmsg(cli, rawnick, chan, msg, *, notice=False):
         return  # channel message but no prefix; ignore
     parse_and_dispatch(wrapper, key, message)
 
-def parse_and_dispatch(wrapper: MessageDispatcher,
-                       key: str,
-                       message: str,
-                       role: Optional[str] = None,
-                       force: Optional[User] = None) -> None:
-    """ Parses a command key and dispatches it should it match a valid command.
+
+def parse_and_dispatch(
+    wrapper: MessageDispatcher,
+    key: str,
+    message: str,
+    role: str | None = None,
+    force: User | None = None,
+) -> None:
+    """Parses a command key and dispatches it should it match a valid command.
 
     :param wrapper: Information about who is executing command and where command is being executed
     :param key: Command name. May be prefixed with command character and role name.
@@ -83,16 +107,15 @@ def parse_and_dispatch(wrapper: MessageDispatcher,
         (channel vs PM) automatically as well.
     :return:
     """
-    _ignore_locals_ = True
     cmd_prefix = config.Main.get("transports[0].user.command_prefix")
     if key.startswith(cmd_prefix):
-        key = key[len(cmd_prefix):]
+        key = key[len(cmd_prefix) :]
 
     # check for role prefix
     parts = key.split(sep=":", maxsplit=1)
     if len(parts) > 1 and len(parts[0]) and not parts[0].isnumeric():
         key = parts[1]
-        role_prefix: Optional[str] = parts[0]
+        role_prefix: str | None = parts[0]
     else:
         key = parts[0]
         role_prefix = None
@@ -191,15 +214,20 @@ def parse_and_dispatch(wrapper: MessageDispatcher,
             else:
                 dispatch.target = users.Bot
         cur_phase = dispatch.game_state.current_phase if dispatch.game_state else "none"
-        if phase == cur_phase: # don't call any more commands if one we just called executed a phase transition
+        if (
+            phase == cur_phase
+        ):  # don't call any more commands if one we just called executed a phase transition
             fn.caller(dispatch, message)
+
 
 def unhandled(cli, prefix, cmd, *args):
     for fn in decorators.HOOKS.get(cmd, []):
         fn.caller(cli, prefix, *args)
 
+
 def ping_server(cli: IRCClient):
-    cli.send("PING :{0}".format(time.time()))
+    cli.send(f"PING :{time.time()}")
+
 
 @command("latency", pm=True)
 def latency(wrapper, message):
@@ -211,6 +239,7 @@ def latency(wrapper, message):
         wrapper.reply(messages["latency"].format(lat))
         hook.unhook(300)
 
+
 @command("", chan=False, pm=True)
 def ctcp_handling(wrapper: MessageDispatcher, message: str):
     """CTCP Handling"""
@@ -220,13 +249,17 @@ def ctcp_handling(wrapper: MessageDispatcher, message: str):
     if message == "\u0001VERSION\u0001":
         try:
             ans = subprocess.check_output(["git", "log", "-n", "1", "--pretty=format:%h"])
-            reply = "\u0001VERSION lykos {0}, Python {1} -- https://github.com/lykoss/lykos\u0001".format(str(ans.decode()), platform.python_version())
+            reply = f"\u0001VERSION lykos {str(ans.decode())}, Python {platform.python_version()} -- https://github.com/lykoss/lykos\u0001"
         except (OSError, subprocess.CalledProcessError):
-            reply = "\u0001VERSION lykos, Python {0} -- https://github.com/lykoss/lykos\u0001".format(platform.python_version())
+            reply = f"\u0001VERSION lykos, Python {platform.python_version()} -- https://github.com/lykoss/lykos\u0001"
         wrapper.pm(reply, notice=True)
         return
     if message == "\u0001TIME\u0001":
-        wrapper.pm("\u0001TIME {0}\u0001".format(time.strftime('%a, %d %b %Y %T %z', time.localtime())), notice=True)
+        wrapper.pm(
+            "\u0001TIME {}\u0001".format(time.strftime("%a, %d %b %Y %T %z", time.localtime())),
+            notice=True,
+        )
+
 
 def connect_callback(cli: IRCClient):
     regaincount = 0
@@ -240,6 +273,7 @@ def connect_callback(cli: IRCClient):
 
         # This callback only sets up event listeners
         from src import wolfgame
+
         wolfgame.connect_callback()
 
         # just in case we haven't managed to successfully auth yet
@@ -258,7 +292,9 @@ def connect_callback(cli: IRCClient):
         event.dispatch(cli)
 
         main_channel = config.Main.get("transports[0].channels.main")
-        channels.Main = channels.add(main_channel["name"], cli, key=main_channel["key"], prefix=main_channel["prefix"])
+        channels.Main = channels.add(
+            main_channel["name"], cli, key=main_channel["key"], prefix=main_channel["prefix"]
+        )
         channels.Dummy = channels.add("*", cli)
         for channel in config.Main.get("transports[0].channels.alternate"):
             channels.add(channel["name"], cli, key=channel["key"], prefix=channel["prefix"])
@@ -266,10 +302,13 @@ def connect_callback(cli: IRCClient):
         users.Bot.change_nick(nick)
 
         if config.Main.get("transports[0].server_ping"):
+
             def ping_server_timer(cli: IRCClient):
                 ping_server(cli)
 
-                t = threading.Timer(config.Main.get("transports[0].server_ping"), ping_server_timer, args=(cli,))
+                t = threading.Timer(
+                    config.Main.get("transports[0].server_ping"), ping_server_timer, args=(cli,)
+                )
                 t.daemon = True
                 t.start()
 
@@ -294,9 +333,19 @@ def connect_callback(cli: IRCClient):
         if not password or bot_nick == nick or regaincount > 3:
             return
         if services.supports_regain():
-            cli.ns_regain(nick=config_nick, password=password, nickserv=services.nickserv, command=services.regain)
+            cli.ns_regain(
+                nick=config_nick,
+                password=password,
+                nickserv=services.nickserv,
+                command=services.regain,
+            )
         else:
-            cli.ns_ghost(nick=config_nick, password=password, nickserv=services.nickserv, command=services.ghost)
+            cli.ns_ghost(
+                nick=config_nick,
+                password=password,
+                nickserv=services.nickserv,
+                command=services.ghost,
+            )
         # it is possible (though unlikely) that regaining the nick fails for some reason and we would loop infinitely
         # as such, keep track of a count of how many times we regain, and after 3 times we no longer attempt to regain nicks
         # Since we'd only be regaining on initial connect, this should be safe. The same trick is used below for release as well
@@ -310,11 +359,21 @@ def connect_callback(cli: IRCClient):
         password = config.Main.get("transports[0].authentication.services.password")
         services = get_services()
         if not password or bot_nick == nick or releasecount > 3:
-            return # prevents the bot from trying to release without a password
+            return  # prevents the bot from trying to release without a password
         if services.supports_release():
-            cli.ns_release(nick=config_nick, password=password, nickserv=services.nickserv, command=services.release)
+            cli.ns_release(
+                nick=config_nick,
+                password=password,
+                nickserv=services.nickserv,
+                command=services.release,
+            )
         else:
-            cli.ns_ghost(nick=config_nick, password=password, nickserv=services.nickserv, command=services.ghost)
+            cli.ns_ghost(
+                nick=config_nick,
+                password=password,
+                nickserv=services.nickserv,
+                command=services.ghost,
+            )
         releasecount += 1
         users.Bot.change_nick(config_nick)
 
@@ -345,7 +404,7 @@ def connect_callback(cli: IRCClient):
         nonlocal supported_sasl, selected_sasl
         # caps is a star because we might receive multiline in LS
         if cmd == "LS":
-            for item in caps[-1].split(): # First item may or may not be *, for multiline
+            for item in caps[-1].split():  # First item may or may not be *, for multiline
                 try:
                     key, value = item.split("=", 1)
                 except ValueError:
@@ -355,10 +414,13 @@ def connect_callback(cli: IRCClient):
                 if key == "sasl" and value is not None:
                     supported_sasl = set(value.split(","))
 
-            if caps[0] == "*": # Multiline, don't continue yet
+            if caps[0] == "*":  # Multiline, don't continue yet
                 return
 
-            if config.Main.get("transports[0].authentication.services.use_sasl") and "sasl" not in supported_caps:
+            if (
+                config.Main.get("transports[0].authentication.services.use_sasl")
+                and "sasl" not in supported_caps
+            ):
                 logger.error("Server does not support SASL authentication")
                 cli.quit()
                 sys.exit(1)
@@ -366,7 +428,7 @@ def connect_callback(cli: IRCClient):
             common_caps = request_caps & supported_caps
 
             if common_caps:
-                cli.send("CAP REQ :{0}".format(" ".join(common_caps)))
+                cli.send("CAP REQ :{}".format(" ".join(common_caps)))
 
         elif cmd == "ACK":
             acked_caps = caps[0].split()
@@ -385,7 +447,7 @@ def connect_callback(cli: IRCClient):
                 selected_sasl = mech
 
                 if supported_sasl is None or mech in supported_sasl:
-                    cli.send("AUTHENTICATE {0}".format(mech))
+                    cli.send(f"AUTHENTICATE {mech}")
                 else:
                     logger.error("Server does not support the SASL {0} mechanism", mech)
                     cli.quit()
@@ -411,7 +473,7 @@ def connect_callback(cli: IRCClient):
                     req_new_caps.add(key)
                 supported_caps.add(key)
             if req_new_caps:
-                cli.send("CAP REQ :{0}".format(" ".join(req_new_caps)))
+                cli.send("CAP REQ :{}".format(" ".join(req_new_caps)))
 
         elif cmd == "DEL":
             # Server no longer supports these capabilities
@@ -421,25 +483,30 @@ def connect_callback(cli: IRCClient):
                 Features.unset(item)
 
     if config.Main.get("transports[0].authentication.services.use_sasl"):
+
         @hook("authenticate")
         def auth_plus(cli: IRCClient, _, plus):
             username: str = config.Main.get("transports[0].authentication.services.username")
             if not username:
                 username = config.Main.get("transports[0].user.nick")
-            password: Optional[str] = config.Main.get("transports[0].authentication.services.password")
+            password: str | None = config.Main.get("transports[0].authentication.services.password")
             if plus == "+":
                 if selected_sasl == "EXTERNAL":
                     cli.send("AUTHENTICATE +")
                 elif selected_sasl == "PLAIN":
                     if password is None:
-                        logger.error("Unable to do authenticate due to no password being set in "
-                                     "transport.authentication.services.password.")
+                        logger.error(
+                            "Unable to do authenticate due to no password being set in "
+                            "transport.authentication.services.password."
+                        )
                         cli.quit()
                         sys.exit(1)
                     else:
                         account = username.encode("utf-8")
                         pwd = password.encode("utf-8")
-                        auth_token = base64.b64encode(b"\0".join((account, account, pwd))).decode("utf-8")
+                        auth_token = base64.b64encode(b"\0".join((account, account, pwd))).decode(
+                            "utf-8"
+                        )
                         cli.send("AUTHENTICATE " + auth_token, log="AUTHENTICATE [redacted]")
 
         @hook("saslsuccess")
@@ -452,18 +519,27 @@ def connect_callback(cli: IRCClient):
         @hook("saslaborted")
         def on_failure_auth(cli: IRCClient, *_):
             nonlocal selected_sasl
-            if selected_sasl == "EXTERNAL" and (supported_sasl is None or "PLAIN" in supported_sasl):
+            if selected_sasl == "EXTERNAL" and (
+                supported_sasl is None or "PLAIN" in supported_sasl
+            ):
                 # EXTERNAL failed, retry with PLAIN as we may not have set up the client cert yet
                 selected_sasl = "PLAIN"
-                logger.warning("EXTERNAL auth failed, retrying with PLAIN... ensure the client cert is set up in NickServ")
+                logger.warning(
+                    "EXTERNAL auth failed, retrying with PLAIN... ensure the client cert is set up in NickServ"
+                )
                 cli.send("AUTHENTICATE PLAIN")
             else:
-                logger.error("Authentication failed. Did you fill the account name "
-                             "in transport.authentication.services.username if it's different from the bot nick?")
+                logger.error(
+                    "Authentication failed. Did you fill the account name "
+                    "in transport.authentication.services.username if it's different from the bot nick?"
+                )
                 cli.quit()
                 sys.exit(1)
 
-    users.Bot = users.BotUser(cli, config.Main.get("transports[0].user.nick"), _temp_ident, _temp_host, _temp_account)
+    users.Bot = users.BotUser(
+        cli, config.Main.get("transports[0].user.nick"), _temp_ident, _temp_host, _temp_account
+    )
+
 
 _temp_ident = None
 _temp_host = None

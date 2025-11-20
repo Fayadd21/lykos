@@ -2,24 +2,26 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Optional
 
 from src import config, users
-from src.containers import UserSet, UserDict
+from src.containers import UserDict, UserSet
 from src.decorators import command
 from src.dispatcher import MessageDispatcher
 from src.events import Event, event_listener
-from src.functions import get_players, get_all_players, get_target
+from src.functions import get_all_players, get_players, get_target
 from src.gamestate import GameState
 from src.messages import messages
-from src.status import try_misdirection, try_exchange, remove_lycanthropy, remove_disease
-from src.users import User
 from src.random import random
+from src.status import remove_disease, remove_lycanthropy, try_exchange, try_misdirection
+from src.users import User
 
 IMMUNIZED = UserSet()
 DOCTORS: UserDict[users.User, int] = UserDict()
 
-@command("immunize", chan=False, pm=True, playing=True, silenced=True, phases=("day",), roles=("doctor",))
+
+@command(
+    "immunize", chan=False, pm=True, playing=True, silenced=True, phases=("day",), roles=("doctor",)
+)
 def immunize(wrapper: MessageDispatcher, message: str):
     """Immunize a player, preventing them from turning into a wolf."""
     if not DOCTORS[wrapper.source]:
@@ -48,42 +50,51 @@ def immunize(wrapper: MessageDispatcher, message: str):
     remove_lycanthropy(var, target)
     remove_disease(var, target)
 
+
 @event_listener("add_lycanthropy")
 def on_add_lycanthropy(evt: Event, var: GameState, target):
     if target in IMMUNIZED:
         evt.prevent_default = True
+
 
 @event_listener("add_disease")
 def on_add_disease(evt: Event, var: GameState, target):
     if target in IMMUNIZED:
         evt.prevent_default = True
 
+
 @event_listener("send_role")
 def on_send_role(evt: Event, var: GameState):
     ps = get_players(var)
     for doctor in get_all_players(var, ("doctor",)):
-        if DOCTORS[doctor]: # has immunizations remaining
+        if DOCTORS[doctor]:  # has immunizations remaining
             pl = ps[:]
             random.shuffle(pl)
             doctor.send(messages["doctor_notify"])
             doctor.send(messages["doctor_immunizations"].format(DOCTORS[doctor]))
+
 
 @event_listener("revealroles")
 def on_revealroles(evt: Event, var: GameState):
     if IMMUNIZED:
         evt.data["output"].append(messages["immunized_revealroles"].format(IMMUNIZED))
 
+
 @event_listener("new_role")
-def on_new_role(evt: Event, var: GameState, player: User, old_role: Optional[str]):
+def on_new_role(evt: Event, var: GameState, player: User, old_role: str | None):
     if evt.data["role"] == "doctor" and old_role != "doctor":
-        DOCTORS[player] = math.ceil(config.Main.get("gameplay.safes.doctor_shots") * len(get_players(var)))
+        DOCTORS[player] = math.ceil(
+            config.Main.get("gameplay.safes.doctor_shots") * len(get_players(var))
+        )
     if evt.data["role"] != "doctor" and old_role == "doctor":
         del DOCTORS[player]
 
+
 @event_listener("get_role_metadata")
-def on_get_role_metadata(evt: Event, var: Optional[GameState], kind: str):
+def on_get_role_metadata(evt: Event, var: GameState | None, kind: str):
     if kind == "role_categories":
         evt.data["doctor"] = {"Village", "Safe"}
+
 
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):

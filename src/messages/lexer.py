@@ -1,17 +1,20 @@
 import sys
-from typing import Optional, TextIO
+from typing import TextIO
+
 from antlr4 import InputStream
+
 from src.messages.message_lexer import message_lexer
+
 
 class Lexer(message_lexer):
     def __init__(self, key: str, inp: InputStream, output: TextIO = sys.stdout):
         super().__init__(inp, output)
-        self._recent: Optional[str] = None
-        self._text: Optional[str] = ""
+        self._recent: str | None = None
+        self._text: str | None = ""
         self.message_key = key
 
-    def append_text(self, text: Optional[str] = None):
-        """ Append a character to the token's text.
+    def append_text(self, text: str | None = None):
+        """Append a character to the token's text.
 
         :param text: If not None, appends this to the text.
             Otherwise, grabs the most recently lexed character from the input.

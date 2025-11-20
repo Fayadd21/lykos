@@ -1,18 +1,17 @@
-from src.gamemodes import game_mode, GameMode, InvalidModeException
-from src.messages import messages
-from src.events import EventListener
-from src import channels, users
+from src.gamemodes import GameMode, game_mode
+
 
 @game_mode("default", minp=6, maxp=24)
 class DefaultMode(GameMode):
     """Default game mode."""
+
     def __init__(self, arg=""):
         super().__init__(arg)
         self.ROLE_GUIDE = {
-            6:  ["wolf", "seer", "cursed villager"],
-            7:  ["cultist", "shaman"],
-            8:  ["harlot", "traitor", "-cultist"],
-            9:  ["crazed shaman"],
+            6: ["wolf", "seer", "cursed villager"],
+            7: ["cultist", "shaman"],
+            8: ["harlot", "traitor", "-cultist"],
+            9: ["crazed shaman"],
             10: ["wolf(2)"],
             11: ["matchmaker"],
             12: ["-wolf", "werecrow"],

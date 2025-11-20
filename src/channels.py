@@ -1,25 +1,26 @@
 from __future__ import annotations
 
-import time
-from enum import Enum
-from typing import Optional, TYPE_CHECKING
-from collections import defaultdict
 import logging
+import time
+from collections import defaultdict
+from enum import Enum
+from typing import TYPE_CHECKING
 
-from src.context import IRCContext, Features, lower
+from src import config, users
+from src.context import Features, IRCContext, lower
+from src.debug import CheckedDict, CheckedSet
 from src.events import Event, EventListener
-from src import users, config
-from src.debug import CheckedSet, CheckedDict
-from src.users import User, BotUser
+from src.users import BotUser, User
 
 if TYPE_CHECKING:
     # gamestate depends on channels; can't turn this into a top-level import
     from src.gamestate import GameState
 
-Main: Channel = None # type: ignore[assignment]
-Dummy: Channel = None # type: ignore[assignment]
+Main: Channel = None  # type: ignore[assignment]
+Dummy: Channel = None  # type: ignore[assignment]
 
 _channels: CheckedDict[str, Channel] = CheckedDict("channels._channels")
+
 
 class _States(Enum):
     NotJoined = "not yet joined"
@@ -30,22 +31,26 @@ class _States(Enum):
 
     Cleared = "cleared"
 
+
 # This is used to tell if this is a fake channel or not. If this
 # function returns a true value, then it's a fake channel. This is
 # useful for testing, where we might want the users in fake channels.
 def predicate(name):
     return not name.startswith(tuple(Features.CHANTYPES))
 
+
 def _normalize(x: str):
     return lower(x.lstrip("".join(Features.STATUSMSG)))
 
-def get(name: str, *, allow_none: bool = False) -> Optional[Channel]:
+
+def get(name: str, *, allow_none: bool = False) -> Channel | None:
     try:
         return _channels[_normalize(name)]
     except KeyError:
         if allow_none:
             return None
         raise
+
 
 def add(name, cli, key="", prefix=""):
     """Add and return a new channel, or an existing one if it exists."""
@@ -59,7 +64,7 @@ def add(name, cli, key="", prefix=""):
 
     if _normalize(name) in _channels:
         if cli is not _channels[_normalize(name)].client:
-            raise RuntimeError("different IRC client for channel {0}".format(name))
+            raise RuntimeError(f"different IRC client for channel {name}")
         return _channels[_normalize(name)]
 
     cls = Channel
@@ -70,22 +75,26 @@ def add(name, cli, key="", prefix=""):
     chan.join(key=key)
     return chan
 
+
 def exists(name):
     """Return True if a channel by the name exists, False otherwise."""
     return _normalize(name) in _channels
+
 
 def channels():
     """Iterate over all the current channels."""
     yield from _channels.values()
 
+
 def _chan_join(evt, channel: Channel, user: User):
     if isinstance(user, BotUser):
         channel.state = _States.Joined
 
+
 EventListener(_chan_join).install("chan_join")
 
-class Channel(IRCContext):
 
+class Channel(IRCContext):
     is_channel = True
 
     def __init__(self, name, client, prefix=""):
@@ -95,7 +104,7 @@ class Channel(IRCContext):
         self.old_modes = defaultdict(set)
         self.timestamp = None
         self.state = _States.NotJoined
-        self.game_state: Optional[GameState] = None
+        self.game_state: GameState | None = None
         self._pending = []
         self._key = ""
 
@@ -104,10 +113,10 @@ class Channel(IRCContext):
         self.modes.clear()
 
     def __str__(self):
-        return "{self.__class__.__name__}: {self.name} ({self.state.value})".format(self=self)
+        return f"{self.__class__.__name__}: {self.name} ({self.state.value})"
 
     def __repr__(self):
-        return "{self.__class__.__name__}({self.name!r})".format(self=self)
+        return f"{self.__class__.__name__}({self.name!r})"
 
     def __format__(self, format_spec):
         if format_spec == "#":
@@ -121,7 +130,7 @@ class Channel(IRCContext):
                     value = "Dummy"
                 else:
                     value = format(id(self), "x")
-                return "{self.__class__.__name__}({0})".format(value, self=self)
+                return f"{self.__class__.__name__}({value})"
             else:
                 return repr(self)
 
@@ -131,7 +140,9 @@ class Channel(IRCContext):
         return hash(self.name)
 
     def __eq__(self, other):
-        return self._compare(other, __class__, "name", "key", "client", "state", "modes", "timestamp")
+        return self._compare(
+            other, __class__, "name", "key", "client", "state", "modes", "timestamp"
+        )
 
     @property
     def key(self):
@@ -154,16 +165,16 @@ class Channel(IRCContext):
             if not key:
                 key = self.key
             self.state = _States.PendingJoin
-            self.client.send("JOIN {0} :{1}".format(self.name, key))
+            self.client.send(f"JOIN {self.name} :{key}")
 
     def part(self, message=""):
         if self.state is _States.Joined:
             self.state = _States.PendingLeave
-            self.client.send("PART {0} :{1}".format(self.name, message))
+            self.client.send(f"PART {self.name} :{message}")
 
     def kick(self, target, message=""):
         if self.state is _States.Joined:
-            self.client.send("KICK {0} {1} :{2}".format(self.name, target, message))
+            self.client.send(f"KICK {self.name} {target} :{message}")
 
     def mode(self, *changes):
         """Perform a mode change on the channel.
@@ -186,7 +197,7 @@ class Channel(IRCContext):
 
         """
 
-        if not changes: # bare call; get channel modes
+        if not changes:  # bare call; get channel modes
             self.client.send("MODE", self.name)
             return
 
@@ -199,7 +210,7 @@ class Channel(IRCContext):
             if len(mode) < 2:
                 mode = "+" + mode
             params.append((mode, target))
-        params.sort(key=lambda x: x[0][0]) # sort by prefix
+        params.sort(key=lambda x: x[0][0])  # sort by prefix
 
         while params:
             cur, params = params[:max_modes], params[max_modes:]
@@ -215,9 +226,9 @@ class Channel(IRCContext):
                 final.append(mode)
 
             for target in targets:
-                if target is not None: # target will be None if the mode is parameter-less
+                if target is not None:  # target will be None if the mode is parameter-less
                     final.append(" ")
-                    final.append("{0}".format(target))
+                    final.append(f"{target}")
 
             self.client.send("MODE", self.name, "".join(final))
 
@@ -232,11 +243,11 @@ class Channel(IRCContext):
 
         """
 
-        set_time = int(time.time()) # for list modes timestamp
+        set_time = int(time.time())  # for list modes timestamp
         list_modes, all_set, only_set, no_set = Features.CHANMODES
         status_modes = Features.PREFIX.values()
         all_modes = list_modes + all_set + only_set + no_set + "".join(status_modes)
-        if self.state is not _States.Joined: # not joined, modes won't have the value
+        if self.state is not _States.Joined:  # not joined, modes won't have the value
             no_set += all_set + only_set
             only_set = ""
             all_set = ""
@@ -251,12 +262,14 @@ class Channel(IRCContext):
                 # some broken ircds have modes without telling us about them in ISUPPORT
                 # ignore such modes but emit a warning
                 transport_name = config.Main.get("transports[0].name")
-                logger = logging.getLogger("transport.{}".format(transport_name))
+                logger = logging.getLogger(f"transport.{transport_name}")
                 logger.warning("Broken ircd detected: unrecognized channel mode +{0}", c)
                 continue
 
             if prefix == "+":
-                if c in status_modes: # op/voice status; keep it here and update the user's registry too
+                if (
+                    c in status_modes
+                ):  # op/voice status; keep it here and update the user's registry too
                     if c not in self.modes:
                         self.modes[c] = set()
                     user = users.get(targets[i], allow_bot=True)
@@ -266,19 +279,22 @@ class Channel(IRCContext):
                         self.old_modes[user].discard(c)
                     i += 1
 
-                elif c in list_modes: # stuff like bans, quiets, and ban and invite exempts
+                elif c in list_modes:  # stuff like bans, quiets, and ban and invite exempts
                     if c not in self.modes:
                         self.modes[c] = {}
-                    self.modes[c][targets[i]] = ((actor.rawnick if actor is not None else None), set_time)
+                    self.modes[c][targets[i]] = (
+                        (actor.rawnick if actor is not None else None),
+                        set_time,
+                    )
                     i += 1
 
                 else:
-                    if c in no_set: # everything else; e.g. +m, +i, etc.
+                    if c in no_set:  # everything else; e.g. +m, +i, etc.
                         targ = None
-                    else: # +f, +l, +j, +k
+                    else:  # +f, +l, +j, +k
                         targ = targets[i]
                         i += 1
-                    if c in only_set and targ.isdigit(): # +l/+j
+                    if c in only_set and targ.isdigit():  # +l/+j
                         targ = int(targ)
                     self.modes[c] = targ
 
@@ -301,7 +317,7 @@ class Channel(IRCContext):
 
                 else:
                     if c in all_set:
-                        i += 1 # -k needs a target, but we don't care about it
+                        i += 1  # -k needs a target, but we don't care about it
                     del self.modes[c]
 
         if "k" in mode:
@@ -315,7 +331,7 @@ class Channel(IRCContext):
                 if not self.modes[mode]:
                     del self.modes[mode]
         del user.channels[self]
-        if not user.channels: # Only fire if the user left all channels
+        if not user.channels:  # Only fire if the user left all channels
             event = Event("cleanup_user", {})
             event.dispatch(self.game_state, user)
 
@@ -328,8 +344,8 @@ class Channel(IRCContext):
         self.timestamp = None
         del _channels[lower(self.name)]
 
-class FakeChannel(Channel):
 
+class FakeChannel(Channel):
     is_fake = True
 
     def join(self, key=""):
@@ -347,7 +363,9 @@ class FakeChannel(Channel):
 
         for change in changes:
             if isinstance(change, str):
-                if change.startswith(("+", "-")): # we're probably asking for the list modes otherwise
+                if change.startswith(
+                    ("+", "-")
+                ):  # we're probably asking for the list modes otherwise
                     modes.append(change)
             else:
                 mode, target = change

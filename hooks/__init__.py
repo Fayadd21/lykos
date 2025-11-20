@@ -1,6 +1,6 @@
-import os.path
 import glob
 import importlib
+import os.path
 
 path = os.path.dirname(os.path.abspath(__file__))
 search = os.path.join(path, "*.py")

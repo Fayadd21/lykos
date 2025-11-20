@@ -1,24 +1,25 @@
 from __future__ import annotations
 
+import inspect
 import json
+import logging
 import platform
 import re
 import subprocess
 import threading
 import traceback
 import urllib.request
-import logging
-import inspect
-from typing import Optional
-from types import TracebackType, FrameType
+from types import FrameType, TracebackType
 
 from src import config
 
 __all__ = ["handle_error"]
 
+
 class _LocalCls(threading.local):
-    handler: Optional[chain_exceptions] = None
+    handler: chain_exceptions | None = None
     level = 0
+
 
 _local = _LocalCls()
 
@@ -28,8 +29,8 @@ _local = _LocalCls()
 
 _tracebacks: dict[str, tuple[str, str]] = {}
 
-class chain_exceptions:
 
+class chain_exceptions:
     def __init__(self, exc, *, suppress_context=False):
         self.exc = exc
         self.suppress_context = suppress_context
@@ -50,13 +51,15 @@ class chain_exceptions:
     def traceback(self):
         return "".join(traceback.format_exception(type(self.exc), self.exc, self.exc.__traceback__))
 
-class print_traceback:
 
+class print_traceback:
     def __enter__(self):
         _local.level += 1
         return self
 
-    def __exit__(self, exc_type: Optional[type], exc_value: Optional[BaseException], tb: Optional[TracebackType]):
+    def __exit__(
+        self, exc_type: type | None, exc_value: BaseException | None, tb: TracebackType | None
+    ):
         if exc_type is None or exc_value is None or tb is None:
             _local.level -= 1
             return False
@@ -67,11 +70,12 @@ class print_traceback:
 
         if _local.level > 1:
             _local.level -= 1
-            return False # the outermost caller should handle this
+            return False  # the outermost caller should handle this
 
         from src import channels
         from src.messages import messages
-        exc_log = logging.getLogger("exception.{}".format(exc_type.__name__))
+
+        exc_log = logging.getLogger(f"exception.{exc_type.__name__}")
         exc_tb = tb
         variables = ["", ""]
         game_state = None
@@ -85,10 +89,12 @@ class print_traceback:
         if traceback_verbosity > 0:
             word = "\nLocal variables from frame #{0} (in {1}):\n"
             variables.append("")
-            frames: list[Optional[FrameType]] = []
+            frames: list[FrameType | None] = []
 
             while tb is not None:
-                ignore_locals = not tb.tb_frame.f_locals or tb.tb_frame.f_locals.get("_ignore_locals_")
+                ignore_locals = not tb.tb_frame.f_locals or tb.tb_frame.f_locals.get(
+                    "_ignore_locals_"
+                )
                 # also ignore locals for library code
                 if "/lib/" in tb.tb_frame.f_code.co_filename.replace("\\", "/"):
                     ignore_locals = True
@@ -103,8 +109,9 @@ class print_traceback:
                 frames = [frames[-1]]
 
             with _local.handler:
-                from src.gamestate import GameState, PregameState
                 from src.dispatcher import MessageDispatcher
+                from src.gamestate import GameState, PregameState
+
                 for i, frame in enumerate(frames, start=1):
                     if frame is None:
                         continue
@@ -119,21 +126,37 @@ class print_traceback:
                         try:
                             if isinstance(value, dict):
                                 try:
-                                    log_value = "{{{0}}}".format(", ".join("{0:for_tb}: {1:for_tb}".format(k, v) for k, v in value.items()))
+                                    log_value = "{{{}}}".format(
+                                        ", ".join(
+                                            f"{k:for_tb}: {v:for_tb}" for k, v in value.items()
+                                        )
+                                    )
                                 except (TypeError, ValueError):
                                     try:
-                                        log_value = "{{{0}}}".format(", ".join("{0!r}: {1:for_tb}".format(k, v) for k, v in value.items()))
+                                        log_value = "{{{}}}".format(
+                                            ", ".join(
+                                                f"{k!r}: {v:for_tb}" for k, v in value.items()
+                                            )
+                                        )
                                     except (TypeError, ValueError):
-                                        log_value = "{{{0}}}".format(", ".join("{0:for_tb}: {1!r}".format(k, v) for k, v in value.items()))
+                                        log_value = "{{{}}}".format(
+                                            ", ".join(
+                                                f"{k:for_tb}: {v!r}" for k, v in value.items()
+                                            )
+                                        )
                             elif isinstance(value, list):
-                                log_value = "[{0}]".format(", ".join(format(v, "for_tb") for v in value))
+                                log_value = "[{}]".format(
+                                    ", ".join(format(v, "for_tb") for v in value)
+                                )
                             elif isinstance(value, set):
-                                log_value = "{{{0}}}".format(", ".join(format(v, "for_tb") for v in value))
+                                log_value = "{{{}}}".format(
+                                    ", ".join(format(v, "for_tb") for v in value)
+                                )
                             else:
                                 log_value = format(value, "for_tb")
                         except (TypeError, ValueError):
                             log_value = repr(value)
-                        variables.append("{0} = {1}".format(name, log_value))
+                        variables.append(f"{name} = {log_value}")
 
             if len(variables) > 3:
                 if traceback_verbosity > 1:
@@ -156,43 +179,52 @@ class print_traceback:
                 if isinstance(value, property) or callable(value):
                     continue
                 try:
-                    variables.append("{0} = {1:for_tb}".format(key, value))
+                    variables.append(f"{key} = {value:for_tb}")
                 except (TypeError, ValueError):
-                    variables.append("{0} = {1!r}".format(key, value))
+                    variables.append(f"{key} = {value!r}")
 
         # dump full list of known users with verbose output, as everything above has truncated output for readability
         if user_data_level > 1:
             import src.users
+
             variables.append("\nAll connected users:\n")
             for user in src.users.users():
-                variables.append("{0:x} = {1:for_tb_verbose}".format(id(user), user))
+                variables.append(f"{id(user):x} = {user:for_tb_verbose}")
             if len(list(src.users.disconnected())) > 0:
                 variables.append("\nAll disconnected users:\n")
                 for user in src.users.disconnected():
-                    variables.append("{0:x} = {1:for_tb_verbose}".format(id(user), user))
+                    variables.append(f"{id(user):x} = {user:for_tb_verbose}")
             else:
                 variables.append("\nNo disconnected users.")
 
         # obtain bot version
         try:
             ans = subprocess.check_output(["git", "log", "-n", "1", "--pretty=format:%h"])
-            variables[0] = "lykos {0}, Python {1}\n".format(str(ans.decode()), platform.python_version())
+            variables[0] = f"lykos {str(ans.decode())}, Python {platform.python_version()}\n"
         except (OSError, subprocess.CalledProcessError):
-            variables[0] = "lykos <unknown>, Python {0}\n".format(platform.python_version())
+            variables[0] = f"lykos <unknown>, Python {platform.python_version()}\n"
 
         # capture variables before sanitization for local logging
         extra_data = {"variables": "\n".join(variables)}
 
         # sanitize paths in tb: convert backslash to forward slash and remove prefixes from src and library paths
         variables[1] = variables[1].replace("\\", "/")
-        variables[1] = re.sub(r'File "[^"]*?/(src|gamemodes|oyoyo|messages|hooks|roles|[Ll]ib|wolfbot)', r'File "/\1', variables[1])
+        variables[1] = re.sub(
+            r'File "[^"]*?/(src|gamemodes|oyoyo|messages|hooks|roles|[Ll]ib|wolfbot)',
+            r'File "/\1',
+            variables[1],
+        )
 
         # the exception message may leak user/channel data since it was stringified without our custom "for_tb" format
         if user_data_level < 2:
-            variables[1] = re.sub(r'User\(([^,]+),.*\)', r'User(\1)' if user_data_level == 1 else "User(?)", variables[1])
+            variables[1] = re.sub(
+                r"User\(([^,]+),.*\)",
+                r"User(\1)" if user_data_level == 1 else "User(?)",
+                variables[1],
+            )
 
         if channel_data_level < 1:
-            variables[1] = re.sub(r'Channel\(.*\)', "Channel(?)", variables[1])
+            variables[1] = re.sub(r"Channel\(.*\)", "Channel(?)", variables[1])
 
         # sanitize values within local frames
         if len(variables) > 3:
@@ -207,11 +239,16 @@ class print_traceback:
         link = _tracebacks.get(full_tb)
         if link is None and not config.Main.get("debug.enabled"):
             api_url = "https://ww.chat/submit"
-            data = None # prevent UnboundLocalError when error log fails to upload
+            data = None  # prevent UnboundLocalError when error log fails to upload
             with _local.handler:
-                req = urllib.request.Request(api_url, json.dumps({
-                        "c": "\n".join(variables),
-                    }).encode("utf-8", "replace"))
+                req = urllib.request.Request(
+                    api_url,
+                    json.dumps(
+                        {
+                            "c": "\n".join(variables),
+                        }
+                    ).encode("utf-8", "replace"),
+                )
 
                 req.add_header("Accept", "application/json")
                 req.add_header("Content-Type", "application/json; charset=utf-8")
@@ -231,15 +268,15 @@ class print_traceback:
         exc_log.error(" ".join(message), exc_info=(exc_type, exc_value, exc_tb), extra=extra_data)
 
         _local.level -= 1
-        if not _local.level: # outermost caller; we're done here
+        if not _local.level:  # outermost caller; we're done here
             _local.handler = None
 
-        return True # a true return value tells the interpreter to swallow the exception
+        return True  # a true return value tells the interpreter to swallow the exception
+
 
 class handle_error:
-
     def __new__(cls, func=None, *, instance=None):
-        if isinstance(func, type(cls)) and instance is func.instance: # already decorated
+        if isinstance(func, type(cls)) and instance is func.instance:  # already decorated
             return func
 
         self = super().__new__(cls)
@@ -257,7 +294,6 @@ class handle_error:
         return self
 
     def __call__(*args, **kwargs):
-        _ignore_locals_ = True
         self, *args = args
         if self.instance is not None:
             args = [self.instance] + args

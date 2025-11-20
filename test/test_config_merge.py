@@ -1,5 +1,7 @@
 from unittest import TestCase
-from src.config import merge, Empty
+
+from src.config import Empty, merge
+
 
 class TestConfigMerge(TestCase):
     def test_merge_str_replace(self):
@@ -167,7 +169,12 @@ class TestConfigMerge(TestCase):
             self.assertIs(merge(metadata, 2, None), None)
 
     def test_merge_enum_replace(self):
-        metadata = {"_type": "enum", "_default": "foo", "_values": ["foo", "bar", "baz"], "_merge": "replace"}
+        metadata = {
+            "_type": "enum",
+            "_default": "foo",
+            "_values": ["foo", "bar", "baz"],
+            "_merge": "replace",
+        }
         with self.subTest("default fallback"):
             self.assertEqual(merge(metadata, Empty, Empty), "foo")
         with self.subTest("base fallback"):
@@ -178,7 +185,12 @@ class TestConfigMerge(TestCase):
             self.assertEqual(merge(metadata, "bar", "baz"), "baz")
 
     def test_merge_list_append(self):
-        metadata = {"_type": "list", "_default": [1], "_items": {"_type": "int"}, "_merge": "append"}
+        metadata = {
+            "_type": "list",
+            "_default": [1],
+            "_items": {"_type": "int"},
+            "_merge": "append",
+        }
         with self.subTest("default fallback"):
             self.assertEqual(merge(metadata, Empty, Empty), [1])
         with self.subTest("base fallback"):
@@ -191,7 +203,12 @@ class TestConfigMerge(TestCase):
             self.assertEqual(merge(metadata, [2], [3]), [2, 3])
 
     def test_merge_list_replace(self):
-        metadata = {"_type": "list", "_default": [1], "_items": {"_type": "int"}, "_merge": "replace"}
+        metadata = {
+            "_type": "list",
+            "_default": [1],
+            "_items": {"_type": "int"},
+            "_merge": "replace",
+        }
         with self.subTest("default fallback"):
             self.assertEqual(merge(metadata, Empty, Empty), [1])
         with self.subTest("base fallback"):
@@ -206,35 +223,34 @@ class TestConfigMerge(TestCase):
             "_type": "dict",
             "_merge": "merge",
             "_default": {
-                "foo": {
-                    "_type": "int",
-                    "_default": 0
-                },
-                "bar": {
-                    "_type": "str",
-                    "_default": ""
-                },
-                "baz": {
-                    "_type": "list",
-                    "_default": [],
-                    "_items": {
-                        "_type": "float"
-                    }
-                }
-            }}
+                "foo": {"_type": "int", "_default": 0},
+                "bar": {"_type": "str", "_default": ""},
+                "baz": {"_type": "list", "_default": [], "_items": {"_type": "float"}},
+            },
+        }
 
         with self.subTest("default fallback"):
             self.assertEqual(merge(metadata, Empty, Empty), {"foo": 0, "bar": "", "baz": []})
         with self.subTest("base fallback"):
-            self.assertEqual(merge(metadata, {"baz": [2.0]}, Empty), {"foo": 0, "bar": "", "baz": [2.0]})
-            self.assertEqual(merge(metadata, {"foo": 1, "bar": "a", "baz": [2.0]}, Empty),
-                             {"foo": 1, "bar": "a", "baz": [2.0]})
+            self.assertEqual(
+                merge(metadata, {"baz": [2.0]}, Empty), {"foo": 0, "bar": "", "baz": [2.0]}
+            )
+            self.assertEqual(
+                merge(metadata, {"foo": 1, "bar": "a", "baz": [2.0]}, Empty),
+                {"foo": 1, "bar": "a", "baz": [2.0]},
+            )
         with self.subTest("empty base"):
-            self.assertEqual(merge(metadata, Empty, {"foo": 1, "bar": "a", "baz": [2.0]}),
-                             {"foo": 1, "bar": "a", "baz": [2.0]})
-            self.assertEqual(merge(metadata, Empty, {"bar": "a"}), {"foo": 0, "bar": "a", "baz": []})
+            self.assertEqual(
+                merge(metadata, Empty, {"foo": 1, "bar": "a", "baz": [2.0]}),
+                {"foo": 1, "bar": "a", "baz": [2.0]},
+            )
+            self.assertEqual(
+                merge(metadata, Empty, {"bar": "a"}), {"foo": 0, "bar": "a", "baz": []}
+            )
         with self.subTest("non-empty base"):
-            self.assertEqual(merge(metadata, {"foo": 1}, {"bar": "a"}), {"foo": 1, "bar": "a", "baz": []})
+            self.assertEqual(
+                merge(metadata, {"foo": 1}, {"bar": "a"}), {"foo": 1, "bar": "a", "baz": []}
+            )
 
     def test_merge_dict_extra(self):
         metadata = {
@@ -242,94 +258,95 @@ class TestConfigMerge(TestCase):
             "_merge": "merge",
             "_extra": True,
             "_default": {
-                "foo": {
-                    "_type": "int",
-                    "_default": 0
-                },
-                "bar": {
-                    "_type": "str",
-                    "_default": ""
-                }
-            }}
+                "foo": {"_type": "int", "_default": 0},
+                "bar": {"_type": "str", "_default": ""},
+            },
+        }
 
         with self.subTest("base fallback"):
-            self.assertEqual(merge(metadata, {"foo": 1, "baz": 2}, Empty), {"foo": 1, "bar": "", "baz": 2})
+            self.assertEqual(
+                merge(metadata, {"foo": 1, "baz": 2}, Empty), {"foo": 1, "bar": "", "baz": 2}
+            )
         with self.subTest("empty base"):
-            self.assertEqual(merge(metadata, Empty, {"foo": 1, "baz": 2}), {"foo": 1, "bar": "", "baz": 2})
+            self.assertEqual(
+                merge(metadata, Empty, {"foo": 1, "baz": 2}), {"foo": 1, "bar": "", "baz": 2}
+            )
         with self.subTest("non-empty base"):
-            self.assertEqual(merge(metadata, {"foo": 1, "a": 2}, {"bar": "baz", "b": 3}), {"foo": 1, "bar": "baz", "a": 2, "b": 3})
+            self.assertEqual(
+                merge(metadata, {"foo": 1, "a": 2}, {"bar": "baz", "b": 3}),
+                {"foo": 1, "bar": "baz", "a": 2, "b": 3},
+            )
 
     def test_merge_dict_replace(self):
         metadata = {
             "_type": "dict",
             "_merge": "replace",
             "_default": {
-                "foo": {
-                    "_type": "int",
-                    "_default": 0
-                },
-                "bar": {
-                    "_type": "str",
-                    "_default": ""
-                },
-                "baz": {
-                    "_type": "list",
-                    "_default": [],
-                    "_items": {
-                        "_type": "float"
-                    }
-                }
-            }}
+                "foo": {"_type": "int", "_default": 0},
+                "bar": {"_type": "str", "_default": ""},
+                "baz": {"_type": "list", "_default": [], "_items": {"_type": "float"}},
+            },
+        }
 
         with self.subTest("default fallback"):
             self.assertEqual(merge(metadata, Empty, Empty), {"foo": 0, "bar": "", "baz": []})
         with self.subTest("base fallback"):
-            self.assertEqual(merge(metadata, {"baz": [2.0]}, Empty), {"foo": 0, "bar": "", "baz": [2.0]})
-            self.assertEqual(merge(metadata, {"foo": 1, "bar": "a", "baz": [2.0]}, Empty),
-                             {"foo": 1, "bar": "a", "baz": [2.0]})
+            self.assertEqual(
+                merge(metadata, {"baz": [2.0]}, Empty), {"foo": 0, "bar": "", "baz": [2.0]}
+            )
+            self.assertEqual(
+                merge(metadata, {"foo": 1, "bar": "a", "baz": [2.0]}, Empty),
+                {"foo": 1, "bar": "a", "baz": [2.0]},
+            )
         with self.subTest("empty base"):
-            self.assertEqual(merge(metadata, Empty, {"foo": 1, "bar": "a", "baz": [2.0]}),
-                             {"foo": 1, "bar": "a", "baz": [2.0]})
-            self.assertEqual(merge(metadata, Empty, {"bar": "a"}), {"foo": 0, "bar": "a", "baz": []})
+            self.assertEqual(
+                merge(metadata, Empty, {"foo": 1, "bar": "a", "baz": [2.0]}),
+                {"foo": 1, "bar": "a", "baz": [2.0]},
+            )
+            self.assertEqual(
+                merge(metadata, Empty, {"bar": "a"}), {"foo": 0, "bar": "a", "baz": []}
+            )
         with self.subTest("non-empty base"):
             # foo: 1 is replaced with the 3rd parameter so it falls back to default (0)
-            self.assertEqual(merge(metadata, {"foo": 1}, {"bar": "a"}), {"foo": 0, "bar": "a", "baz": []})
+            self.assertEqual(
+                merge(metadata, {"foo": 1}, {"bar": "a"}), {"foo": 0, "bar": "a", "baz": []}
+            )
 
     def test_merge_tagged_replace(self):
         metadata = {
             "_type": "tagged",
             "_merge": "replace",
             "_tags": {
-                "int": {
-                    "_type": "dict",
-                    "_default": {
-                        "intval": {
-                            "_type": "int"
-                        }
-                    }
-                },
-                "str": {
-                    "_type": "dict",
-                    "_default": {
-                        "strval": {
-                            "_type": "str"
-                        }
-                    }
-                }
-            }
+                "int": {"_type": "dict", "_default": {"intval": {"_type": "int"}}},
+                "str": {"_type": "dict", "_default": {"strval": {"_type": "str"}}},
+            },
         }
         # no default fallback sub-test because base and settings both being Empty is an error for tagged types
         with self.subTest("base fallback"):
-            self.assertEqual(merge(metadata, {"type": "int", "intval": 1}, Empty), {"type": "int", "intval": 1})
-            self.assertEqual(merge(metadata, {"type": "str", "strval": "a"}, Empty), {"type": "str", "strval": "a"})
+            self.assertEqual(
+                merge(metadata, {"type": "int", "intval": 1}, Empty), {"type": "int", "intval": 1}
+            )
+            self.assertEqual(
+                merge(metadata, {"type": "str", "strval": "a"}, Empty),
+                {"type": "str", "strval": "a"},
+            )
         with self.subTest("empty base"):
-            self.assertEqual(merge(metadata, Empty, {"type": "int", "intval": 1}), {"type": "int", "intval": 1})
-            self.assertEqual(merge(metadata, Empty, {"type": "str", "strval": "a"}), {"type": "str", "strval": "a"})
+            self.assertEqual(
+                merge(metadata, Empty, {"type": "int", "intval": 1}), {"type": "int", "intval": 1}
+            )
+            self.assertEqual(
+                merge(metadata, Empty, {"type": "str", "strval": "a"}),
+                {"type": "str", "strval": "a"},
+            )
         with self.subTest("non-empty base"):
-            self.assertEqual(merge(metadata, {"type": "int", "intval": 1}, {"type": "str", "strval": "a"}),
-                             {"type": "str", "strval": "a"})
-            self.assertEqual(merge(metadata, {"type": "str", "strval": "a"}, {"type": "int", "intval": 1}),
-                             {"type": "int", "intval": 1})
+            self.assertEqual(
+                merge(metadata, {"type": "int", "intval": 1}, {"type": "str", "strval": "a"}),
+                {"type": "str", "strval": "a"},
+            )
+            self.assertEqual(
+                merge(metadata, {"type": "str", "strval": "a"}, {"type": "int", "intval": 1}),
+                {"type": "int", "intval": 1},
+            )
 
     def test_merge_complex(self):
         metadata = {"_type": {"_type": "int", "_default": 1, "_merge": "replace"}}
@@ -343,7 +360,12 @@ class TestConfigMerge(TestCase):
             self.assertEqual(merge(metadata, 2, 3), 3)
 
     def test_merge_union(self):
-        metadata = {"_type": ["int", "str"], "_nullable": True, "_default": None, "_merge": "replace"}
+        metadata = {
+            "_type": ["int", "str"],
+            "_nullable": True,
+            "_default": None,
+            "_merge": "replace",
+        }
         with self.subTest("default fallback"):
             self.assertIs(merge(metadata, Empty, Empty), None)
         with self.subTest("base fallback"):
@@ -475,15 +497,9 @@ class TestConfigMerge(TestCase):
         metadata = {
             "_type": "tagged",
             "_tags": {
-                "int": {
-                    "_type": "dict",
-                    "_default": {"intval": {"_type": "int"}}
-                },
-                "str": {
-                    "_type": "dict",
-                    "_default": {"strval": {"_type": "str"}}
-                }
-            }
+                "int": {"_type": "dict", "_default": {"intval": {"_type": "int"}}},
+                "str": {"_type": "dict", "_default": {"strval": {"_type": "str"}}},
+            },
         }
         with self.subTest("value required"):
             self.assertRaises(TypeError, merge, metadata, Empty, Empty)
@@ -495,7 +511,9 @@ class TestConfigMerge(TestCase):
         with self.subTest("invalid typed value"):
             self.assertRaises(TypeError, merge, metadata, Empty, {"type": "int", "strval": "a"})
         with self.subTest("extraneous keys"):
-            self.assertRaises(TypeError, merge, metadata, Empty, {"type": "int", "intval": 1, "strval": "a"})
+            self.assertRaises(
+                TypeError, merge, metadata, Empty, {"type": "int", "intval": 1, "strval": "a"}
+            )
         with self.subTest("invalid type"):
             self.assertRaises(TypeError, merge, metadata, Empty, 2)
             self.assertRaises(TypeError, merge, metadata, Empty, 2.0)
@@ -529,25 +547,8 @@ class TestConfigMerge(TestCase):
     def test_constructors(self):
         metadata = {
             "_type": "dict",
-            "_ctors": [
-                {
-                    "_type": "str",
-                    "_set": "a"
-                },
-                {
-                    "_type": "int",
-                    "_set": "b"
-                }
-            ],
-            "_default": {
-                "a": {
-                    "_type": "str"
-                },
-                "b": {
-                    "_type": "int",
-                    "_default": 3
-                }
-            }
+            "_ctors": [{"_type": "str", "_set": "a"}, {"_type": "int", "_set": "b"}],
+            "_default": {"a": {"_type": "str"}, "b": {"_type": "int", "_default": 3}},
         }
         with self.subTest("fully-specified"):
             self.assertEqual(merge(metadata, Empty, {"a": "foo", "b": 4}), {"a": "foo", "b": 4})

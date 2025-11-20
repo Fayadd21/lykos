@@ -1,40 +1,46 @@
 from collections import defaultdict
 
-from src.gamemodes import game_mode, GameMode
-from src.gamestate import GameState
-from src.events import EventListener, Event
-from src.trans import chk_win_conditions
 from src import users
-from src.cats import All, Wolf, Wolf_Objective, Vampire_Objective, Killer, Hidden_Eligible
+from src.cats import All, Hidden_Eligible, Killer, Vampire_Objective, Wolf, Wolf_Objective
+from src.events import Event, EventListener
+from src.gamemodes import GameMode, game_mode
+from src.gamestate import GameState
 from src.random import random
+from src.trans import chk_win_conditions
+
 
 @game_mode("random", minp=8, maxp=24)
 class RandomMode(GameMode):
     """Completely random and hidden roles."""
+
     def __init__(self, arg=""):
         super().__init__(arg)
         self.CUSTOM_SETTINGS.role_reveal = random.choice(("on", "off", "team"))
-        self.CUSTOM_SETTINGS.stats_type = "disabled" if self.CUSTOM_SETTINGS.role_reveal == "off" else random.choice(("disabled", "team"))
+        self.CUSTOM_SETTINGS.stats_type = (
+            "disabled"
+            if self.CUSTOM_SETTINGS.role_reveal == "off"
+            else random.choice(("disabled", "team"))
+        )
         for role in self.SECONDARY_ROLES:
             self.SECONDARY_ROLES[role] = All
 
         self.TOTEM_CHANCES = {
-            "death"         : {"shaman": 8, "wolf shaman": 1},
-            "protection"    : {"shaman": 6, "wolf shaman": 6},
-            "silence"       : {"shaman": 4, "wolf shaman": 3},
-            "revealing"     : {"shaman": 2, "wolf shaman": 5},
-            "desperation"   : {"shaman": 4, "wolf shaman": 7},
-            "impatience"    : {"shaman": 7, "wolf shaman": 2},
-            "pacifism"      : {"shaman": 7, "wolf shaman": 2},
-            "influence"     : {"shaman": 7, "wolf shaman": 2},
-            "narcolepsy"    : {"shaman": 4, "wolf shaman": 3},
-            "exchange"      : {"shaman": 1, "wolf shaman": 1},
-            "lycanthropy"   : {"shaman": 1, "wolf shaman": 3},
-            "luck"          : {"shaman": 6, "wolf shaman": 7},
-            "pestilence"    : {"shaman": 3, "wolf shaman": 1},
-            "retribution"   : {"shaman": 5, "wolf shaman": 6},
-            "misdirection"  : {"shaman": 6, "wolf shaman": 4},
-            "deceit"        : {"shaman": 3, "wolf shaman": 6},
+            "death": {"shaman": 8, "wolf shaman": 1},
+            "protection": {"shaman": 6, "wolf shaman": 6},
+            "silence": {"shaman": 4, "wolf shaman": 3},
+            "revealing": {"shaman": 2, "wolf shaman": 5},
+            "desperation": {"shaman": 4, "wolf shaman": 7},
+            "impatience": {"shaman": 7, "wolf shaman": 2},
+            "pacifism": {"shaman": 7, "wolf shaman": 2},
+            "influence": {"shaman": 7, "wolf shaman": 2},
+            "narcolepsy": {"shaman": 4, "wolf shaman": 3},
+            "exchange": {"shaman": 1, "wolf shaman": 1},
+            "lycanthropy": {"shaman": 1, "wolf shaman": 3},
+            "luck": {"shaman": 6, "wolf shaman": 7},
+            "pestilence": {"shaman": 3, "wolf shaman": 1},
+            "retribution": {"shaman": 5, "wolf shaman": 6},
+            "misdirection": {"shaman": 6, "wolf shaman": 4},
+            "deceit": {"shaman": 3, "wolf shaman": 6},
         }
 
         self.ROLE_SETS["gunner/sharpshooter"] = {"gunner": 8, "sharpshooter": 4}
@@ -42,13 +48,15 @@ class RandomMode(GameMode):
 
         self.EVENTS = {
             "role_attribution": EventListener(self.role_attribution),
-            "chK_win": EventListener(self.lovers_chk_win, listener_id="lovers_chk_win")
+            "chK_win": EventListener(self.lovers_chk_win, listener_id="lovers_chk_win"),
         }
 
     def role_attribution(self, evt: Event, var: GameState, villagers):
         lpl = len(villagers)
         addroles = evt.data["addroles"]
-        addroles[random.choice(list(Wolf & Killer))] += 1 # make sure there's at least one wolf role
+        addroles[random.choice(list(Wolf & Killer))] += (
+            1  # make sure there's at least one wolf role
+        )
         num_wolves = 1
         num_vampires = 0
         roles = list(All - self.SECONDARY_ROLES.keys() - Hidden_Eligible - {"amnesiac"})

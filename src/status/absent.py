@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from src.events import Event, event_listener
 from src.containers import UserDict
+from src.events import Event, event_listener
 from src.functions import get_players
-from src.messages import messages
 from src.gamestate import GameState
+from src.messages import messages
 from src.users import User
 
 __all__ = ["add_absent", "try_absent", "get_absent"]
 
 ABSENT: UserDict[User, str] = UserDict()
+
 
 def add_absent(var: GameState, target: User, reason: str):
     if target not in get_players(var):
@@ -25,27 +26,35 @@ def add_absent(var: GameState, target: User, reason: str):
                 del VOTES[votee]
             break
 
+
 def try_absent(var: GameState, user: User):
     if user in ABSENT:
         user.send(messages[ABSENT[user] + "_absent"])
         return True
     return False
 
+
 def get_absent(var: GameState):
     return set(ABSENT)
 
+
 @event_listener("del_player")
-def on_del_player(evt: Event, var: GameState, player: User, allroles: set[str], death_triggers: bool):
+def on_del_player(
+    evt: Event, var: GameState, player: User, allroles: set[str], death_triggers: bool
+):
     del ABSENT[:player:]
+
 
 @event_listener("revealroles")
 def on_revealroles(evt: Event, var: GameState):
     if ABSENT:
         evt.data["output"].append(messages["absent_revealroles"].format(ABSENT))
 
+
 @event_listener("transition_night_begin")
 def on_transition_night_begin(evt: Event, var: GameState):
     ABSENT.clear()
+
 
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):

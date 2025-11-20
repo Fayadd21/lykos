@@ -5,37 +5,48 @@ import logging
 import math
 import re
 from collections import defaultdict
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from src import channels, config
-from src.match import match_one
-from src.trans import NIGHT_IDLE_EXEMPT
-from src.users import User
-from src.containers import UserSet, UserDict, DefaultUserDict
+from src.cats import Category, Vampire, Vampire_Team, Village, Wolf, Wolfteam
+from src.containers import DefaultUserDict, UserDict, UserSet
 from src.decorators import command
 from src.dispatcher import MessageDispatcher
 from src.events import Event, EventListener
-from src.functions import get_players, get_main_role, get_target, change_role, get_all_players
-from src.gamemodes import game_mode, GameMode
+from src.functions import change_role, get_all_players, get_main_role, get_players, get_target
+from src.gamemodes import GameMode, game_mode
 from src.gamestate import GameState
-from src.messages import messages, LocalRole
-from src.locations import move_player, Location, VillageSquare, Forest, Graveyard, Streets
-from src.cats import Wolf, Vampire, Category, Wolfteam, Vampire_Team, Village
-from src.status import add_protection, add_day_vote_immunity, get_all_protections
-from src.roles.helper.wolves import send_wolfchat_message, wolf_kill, wolf_retract, is_known_wolf_ally
-from src.roles.vampire import send_vampire_chat_message, vampire_bite, vampire_retract, is_known_vampire_ally
-from src.roles.vampire import on_player_protected as vampire_drained
-from src.roles.vampire import GameState as VampireGameState
-from src.roles.vigilante import vigilante_retract, vigilante_pass, vigilante_kill
+from src.locations import Forest, Graveyard, Location, Streets, VillageSquare, move_player
+from src.match import match_one
+from src.messages import messages
 from src.random import random
+from src.roles.helper.wolves import (
+    is_known_wolf_ally,
+    send_wolfchat_message,
+    wolf_kill,
+    wolf_retract,
+)
+from src.roles.vampire import (
+    is_known_vampire_ally,
+    send_vampire_chat_message,
+    vampire_bite,
+    vampire_retract,
+)
+from src.roles.vampire import on_player_protected as vampire_drained
+from src.roles.vigilante import vigilante_kill, vigilante_pass, vigilante_retract
+from src.status import add_day_vote_immunity, add_protection, get_all_protections
+from src.trans import NIGHT_IDLE_EXEMPT
+from src.users import User
 
 # dummy location for wolves/vigilantes/vampires that have elected to kill/bite instead of visit a location
 Limbo = Location("<<hunting>>")
 _logger = logging.getLogger("game.pactbreaker")
 
+
 @game_mode("pactbreaker", minp=6, maxp=24)
 class PactBreakerMode(GameMode):
     """Help a rogue vigilante take down the terrors of the night or re-establish your pact with the werewolves!"""
+
     def __init__(self, arg=""):
         super().__init__(arg)
         self.CUSTOM_SETTINGS.limit_abstain = False
@@ -92,19 +103,27 @@ class PactBreakerMode(GameMode):
         self.protected = UserSet()
         self.turned = UserSet()
         self.voted: DefaultUserDict[User, int] = DefaultUserDict(int)
-        self.last_voted: Optional[User] = None
+        self.last_voted: User | None = None
         self.active_players = UserSet()
-        self.in_stocks: Optional[User] = None
-        self.collected_evidence: DefaultUserDict[User, DefaultUserDict[str, UserSet]] = DefaultUserDict(lambda: DefaultUserDict(UserSet))
+        self.in_stocks: User | None = None
+        self.collected_evidence: DefaultUserDict[User, DefaultUserDict[str, UserSet]] = (
+            DefaultUserDict(lambda: DefaultUserDict(UserSet))
+        )
         self.clue_pool = 0
         self.clue_tokens: DefaultUserDict[User, int] = DefaultUserDict(int)
         kwargs = dict(chan=False, pm=True, playing=True, register=False)
         self.visit_command = command("visit", phases=("night",), **kwargs)(self.visit)
         self.id_command = command("id", phases=("day",), **kwargs)(self.identify)
         self.observe_command = command("observe", phases=("day",), **kwargs)(self.observe)
-        self.kill_command = command("kill", phases=("night",), roles=("wolf", "vigilante"), **kwargs)(self.kill)
-        self.bite_command = command("bite", phases=("night",), roles=("vampire",), **kwargs)(self.bite)
-        self.stats_command = command("stats", pm=True, in_game_only=True, register=False)(self.stats)
+        self.kill_command = command(
+            "kill", phases=("night",), roles=("wolf", "vigilante"), **kwargs
+        )(self.kill)
+        self.bite_command = command("bite", phases=("night",), roles=("vampire",), **kwargs)(
+            self.bite
+        )
+        self.stats_command = command("stats", pm=True, in_game_only=True, register=False)(
+            self.stats
+        )
 
     def startup(self):
         super().startup()
@@ -180,7 +199,9 @@ class PactBreakerMode(GameMode):
         pl = get_players(var)
         self.active_players.update(pl)
         # initialize clue pool
-        self.clue_pool = math.ceil(config.Main.get("gameplay.modes.pactbreaker.clue.pool") * len(pl))
+        self.clue_pool = math.ceil(
+            config.Main.get("gameplay.modes.pactbreaker.clue.pool") * len(pl)
+        )
 
     def on_send_role(self, evt: Event, var: GameState):
         pl = get_players(var)
@@ -209,13 +230,15 @@ class PactBreakerMode(GameMode):
             entries = []
             for target, role in evidence.items():
                 entries.append(messages["pactbreaker_info_evidence_entry"].format(target, role))
-            evt.data["messages"].append(messages["pactbreaker_info_evidence"].format(sorted(entries)))
+            evt.data["messages"].append(
+                messages["pactbreaker_info_evidence"].format(sorted(entries))
+            )
 
     def on_revealroles(self, evt: Event, var: GameState):
         tlist = []
         for player, tokens in self.clue_tokens.items():
             if tokens > 0:
-                tlist.append("{0} ({1})".format(player.name, tokens))
+                tlist.append(f"{player.name} ({tokens})")
         if tlist:
             evt.data["output"].append(messages["pactbreaker_revealroles"].format(sorted(tlist)))
 
@@ -232,32 +255,42 @@ class PactBreakerMode(GameMode):
         for player in stocks_players:
             move_player(var, player, VillageSquare)
 
-    def build_deck(self, var: GameState, location: Location, visitors: set[User]) -> tuple[list[str], int]:
+    def build_deck(
+        self, var: GameState, location: Location, visitors: set[User]
+    ) -> tuple[list[str], int]:
         num_visitors = len(visitors)
         num_wolves = sum(1 for v in visitors if get_main_role(var, v) == "wolf")
         num_other = num_visitors - num_wolves
 
         if location is Forest:
-            deck = (["empty-handed"] * 2
-                    + ["evidence"] * 4
-                    + (["hunted", "hunted", "empty-handed"] * num_wolves)
-                    + (["evidence", "evidence", "empty-handed"] * num_other))
+            deck = (
+                ["empty-handed"] * 2
+                + ["evidence"] * 4
+                + (["hunted", "hunted", "empty-handed"] * num_wolves)
+                + (["evidence", "evidence", "empty-handed"] * num_other)
+            )
             num_draws = 2
         elif location is VillageSquare:
-            deck = (["empty_handed"] * (2 * max(0, num_visitors - 4))
-                    + ["evidence"] * 8
-                    + ["clue", "clue"] * num_visitors)
+            deck = (
+                ["empty_handed"] * (2 * max(0, num_visitors - 4))
+                + ["evidence"] * 8
+                + ["clue", "clue"] * num_visitors
+            )
             num_draws = 4
         elif location is Graveyard:
-            deck = (["clue"] * 3
-                    + ["empty-handed"] * 2
-                    + ["hunted", "empty-handed"] * num_wolves
-                    + ["empty-handed", "empty-handed"] * num_other)
+            deck = (
+                ["clue"] * 3
+                + ["empty-handed"] * 2
+                + ["hunted", "empty-handed"] * num_wolves
+                + ["empty-handed", "empty-handed"] * num_other
+            )
             num_draws = 1
         elif location is Streets:
-            deck = (["evidence"] * 7
-                    + ["hunted", "evidence", "empty-handed"] * num_wolves
-                    + ["evidence", "evidence", "empty-handed"] * num_other)
+            deck = (
+                ["evidence"] * 7
+                + ["hunted", "evidence", "empty-handed"] * num_wolves
+                + ["evidence", "evidence", "empty-handed"] * num_other
+            )
             num_draws = 3
         else:
             raise RuntimeError(f"No deck defined for location {location.name}")
@@ -311,9 +344,11 @@ class PactBreakerMode(GameMode):
         visited: dict[Location, set[User]] = defaultdict(set)
         for player, location in self.visiting.items():
             # if they died from !kill or !bite, don't have them draw cards or count them as visiting a location
-            if player not in evt.data["victims"] or (len(evt.data["killers"][player]) == 1
-                                                     and evt.data["killers"][player][0] in all_vamps
-                                                     and get_all_protections(var, player, Vampire)):
+            if player not in evt.data["victims"] or (
+                len(evt.data["killers"][player]) == 1
+                and evt.data["killers"][player][0] in all_vamps
+                and get_all_protections(var, player, Vampire)
+            ):
                 visited[location].add(player)
 
         shares: set[User] = set()
@@ -335,7 +370,7 @@ class PactBreakerMode(GameMode):
                 # vamps draw 2 cards at graveyard instead of 1
                 # wolves draw 3 cards at forest instead of 2
                 extra_draws = 1 if (visitor_role, location) in extra else 0
-                cards = deck[i:i + num_draws + extra_draws]
+                cards = deck[i : i + num_draws + extra_draws]
                 i += num_draws + extra_draws
                 empty = True
                 _logger.debug("[{0}] {1}: {2}", loc, visitor.name, ", ".join(cards))
@@ -357,7 +392,10 @@ class PactBreakerMode(GameMode):
                 if "clue" in cards and self.clue_pool > 0:
                     empty = False
                     if location is Graveyard:
-                        tokens = min(self.clue_pool, config.Main.get("gameplay.modes.pactbreaker.clue.graveyard"))
+                        tokens = min(
+                            self.clue_pool,
+                            config.Main.get("gameplay.modes.pactbreaker.clue.graveyard"),
+                        )
                         self.clue_pool -= tokens
                         self.clue_tokens[visitor] += tokens
                         visitor.send(messages[f"pactbreaker_{loc}_clue"].format(tokens))
@@ -371,7 +409,10 @@ class PactBreakerMode(GameMode):
                 if location is Forest and visitor not in all_wolves:
                     random.shuffle(wl)
                     for wolf in wl:
-                        if wolf is not visitor and wolf not in self.collected_evidence[visitor]["wolf"]:
+                        if (
+                            wolf is not visitor
+                            and wolf not in self.collected_evidence[visitor]["wolf"]
+                        ):
                             evidence_target = wolf
                             break
                     else:
@@ -380,12 +421,17 @@ class PactBreakerMode(GameMode):
                 elif location is Streets and num_evidence == 3:
                     # refute fake evidence that the visitor may have collected
                     # if there's no fake evidence, fall back to giving a clue token
-                    collected = functools.reduce(lambda x, y: x | y, self.collected_evidence[visitor].values(), set())
+                    collected = functools.reduce(
+                        lambda x, y: x | y, self.collected_evidence[visitor].values(), set()
+                    )
                     role_order = ("wolf", "villager", "vigilante")
                     for role in role_order:
                         for target in self.collected_evidence[visitor][role]:
                             real_role = get_main_role(var, target)
-                            if real_role != role and target not in self.collected_evidence[visitor][real_role]:
+                            if (
+                                real_role != role
+                                and target not in self.collected_evidence[visitor][real_role]
+                            ):
                                 evidence_target = target
                                 break
                         if evidence_target is not None:
@@ -393,7 +439,10 @@ class PactBreakerMode(GameMode):
 
                     # no evidence to refute? give a special message indicating that
                     if collected and evidence_target is None:
-                        tokens = min(self.clue_pool, config.Main.get(f"gameplay.modes.pactbreaker.clue.{loc}"))
+                        tokens = min(
+                            self.clue_pool,
+                            config.Main.get(f"gameplay.modes.pactbreaker.clue.{loc}"),
+                        )
                         self.clue_pool -= tokens
                         self.clue_tokens[visitor] += tokens
                         visitor.send(messages[f"pactbreaker_{loc}_special"].format(tokens))
@@ -410,17 +459,30 @@ class PactBreakerMode(GameMode):
                         if num_evidence == 2 and evidence_target in all_cursed:
                             target_role = "wolf"
                         elif num_evidence == 2 and get_main_role(var, evidence_target) == "vampire":
-                            target_role = "vigilante" if evidence_target in self.turned else "villager"
+                            target_role = (
+                                "vigilante" if evidence_target in self.turned else "villager"
+                            )
                         else:
                             target_role = get_main_role(var, evidence_target)
                         # also hide vigi evidence (or vigi fake evidence) from vills
-                        if num_evidence == 2 and target_role == "vigilante" and visitor_role == "villager":
+                        if (
+                            num_evidence == 2
+                            and target_role == "vigilante"
+                            and visitor_role == "villager"
+                        ):
                             target_role = "villager"
                         self.collected_evidence[visitor][target_role].add(evidence_target)
-                        visitor.send(messages[f"pactbreaker_{loc}_evidence"].format(evidence_target, target_role))
+                        visitor.send(
+                            messages[f"pactbreaker_{loc}_evidence"].format(
+                                evidence_target, target_role
+                            )
+                        )
                     elif self.clue_pool > 0 and location is not VillageSquare:
                         empty = False
-                        tokens = min(self.clue_pool, config.Main.get(f"gameplay.modes.pactbreaker.clue.{loc}"))
+                        tokens = min(
+                            self.clue_pool,
+                            config.Main.get(f"gameplay.modes.pactbreaker.clue.{loc}"),
+                        )
                         self.clue_pool -= tokens
                         self.clue_tokens[visitor] += tokens
                         visitor.send(messages[f"pactbreaker_{loc}_clue"].format(tokens))
@@ -434,8 +496,10 @@ class PactBreakerMode(GameMode):
                 loc = self.visiting[visitor].name
                 visitor.send(messages[f"pactbreaker_{loc}_empty"])
         elif len(shares) > 1:
-            num_tokens = min(math.floor(self.clue_pool / len(shares)),
-                             config.Main.get("gameplay.modes.pactbreaker.clue.square"))
+            num_tokens = min(
+                math.floor(self.clue_pool / len(shares)),
+                config.Main.get("gameplay.modes.pactbreaker.clue.square"),
+            )
             for visitor in shares:
                 loc = self.visiting[visitor].name
                 if num_tokens > 0:
@@ -445,35 +509,47 @@ class PactBreakerMode(GameMode):
                 else:
                     visitor.send(messages[f"pactbreaker_{loc}_empty"])
 
-    def on_player_protected(self,
-                            evt: Event,
-                            var: GameState,
-                            target: User,
-                            attacker: Optional[User],
-                            attacker_role: str,
-                            protector: Optional[User],
-                            protector_role: str,
-                            reason: str):
+    def on_player_protected(
+        self,
+        evt: Event,
+        var: GameState,
+        target: User,
+        attacker: User | None,
+        attacker_role: str,
+        protector: User | None,
+        protector_role: str,
+        reason: str,
+    ):
         if protector_role in ("vampire", "wolf"):
             # mark them for internal gameplay purposes (wolves go into protected before drained)
             self.protected.add(target) if protector_role == "wolf" else self.drained.add(target)
             # mark them for vampires' private player listings (during !stats or nighttime notification messages)
-            vvar = var # type: VampireGameState
+            vvar = var  # type: VampireGameState
             vvar.vampire_drained.add(target)
             attacker.send(messages["pactbreaker_drain"].format(target))
             target.send(messages["pactbreaker_drained"])
             # give the victim tokens before vamp so that pool exhaustion doesn't overly benefit vamp
-            victim_tokens = min(config.Main.get("gameplay.modes.pactbreaker.clue.bitten"), self.clue_pool)
+            victim_tokens = min(
+                config.Main.get("gameplay.modes.pactbreaker.clue.bitten"), self.clue_pool
+            )
             self.clue_pool -= victim_tokens
             self.clue_tokens[target] += victim_tokens
-            vamp_tokens = min(config.Main.get("gameplay.modes.pactbreaker.clue.bite"), self.clue_pool)
+            vamp_tokens = min(
+                config.Main.get("gameplay.modes.pactbreaker.clue.bite"), self.clue_pool
+            )
             self.clue_pool -= vamp_tokens
             self.clue_tokens[attacker] += vamp_tokens
         elif protector_role == "vigilante":
             # if the vampire fully drains a vigilante, they might turn into a vampire instead of dying
             # this protection triggering means they should turn
             attacker.send(messages["pactbreaker_drain_turn"].format(target))
-            change_role(var, target, get_main_role(var, target), "vampire", message="pactbreaker_drained_vigilante")
+            change_role(
+                var,
+                target,
+                get_main_role(var, target),
+                "vampire",
+                message="pactbreaker_drained_vigilante",
+            )
             self.turned.add(target)
             self.drained.discard(target)
 
@@ -506,10 +582,16 @@ class PactBreakerMode(GameMode):
             # shouldn't happen; indicates a bug in the mode
             raise RuntimeError(f"Unknown night death situation ({killer_role})")
 
-    def on_transition_day_resolve(self, evt: Event, var: GameState, dead: set[User], killers: dict[User, User | str]):
+    def on_transition_day_resolve(
+        self, evt: Event, var: GameState, dead: set[User], killers: dict[User, User | str]
+    ):
         # check for players meant to kill someone but got their kill pre-empted by someone else
         for killer, victim in self.killing.items():
-            if victim in dead and killers[victim] is not killer and (killer, victim) in self.night_kill_messages:
+            if (
+                victim in dead
+                and killers[victim] is not killer
+                and (killer, victim) in self.night_kill_messages
+            ):
                 killer.send(messages["pactbreaker_kill_fail"].format(victim))
 
         self.night_kill_messages.clear()
@@ -530,7 +612,9 @@ class PactBreakerMode(GameMode):
         for player, amount in self.clue_tokens.items():
             if amount == 0:
                 continue
-            player.send(messages["pactbreaker_clue_notify"].format(amount, observe_tokens, id_tokens))
+            player.send(
+                messages["pactbreaker_clue_notify"].format(amount, observe_tokens, id_tokens)
+            )
 
     def on_day_vote(self, evt: Event, var: GameState, votee: User, voters: Iterable[User]):
         self.last_voted = votee
@@ -553,11 +637,15 @@ class PactBreakerMode(GameMode):
     def on_wolf_numkills(self, evt: Event, var: GameState, wolf):
         evt.data["numkills"] = 0
 
-    def on_update_stats(self, evt: Event, var: GameState, player, main_role, reveal_role, all_roles):
+    def on_update_stats(
+        self, evt: Event, var: GameState, player, main_role, reveal_role, all_roles
+    ):
         if main_role == "vampire":
             evt.data["possible"].add("vigilante")
 
-    def on_chk_win(self, evt: Event, var: GameState, rolemap, mainroles, lpl, lwolves, lrealwolves, lvampires):
+    def on_chk_win(
+        self, evt: Event, var: GameState, rolemap, mainroles, lpl, lwolves, lrealwolves, lvampires
+    ):
         num_vigilantes = len(get_players(var, ("vigilante",), mainroles=mainroles))
         num_villagers = len(get_players(var, ("villager",), mainroles=mainroles))
 
@@ -571,7 +659,7 @@ class PactBreakerMode(GameMode):
                 # Wolves won and all vigilantes are dead, or vampire met normal win cond, so this is an actual win
                 # Message keys used: pactbreaker_wolf_win pactbreaker_vampire_win
                 key = "wolf" if evt.data["winner"] is Wolfteam else "vampire"
-                evt.data["message"] = messages["pactbreaker_{0}_win".format(key)]
+                evt.data["message"] = messages[f"pactbreaker_{key}_win"]
         elif num_vigilantes == 0 and lvampires == 0:
             # wolves (and villagers) win even if there is a minority of wolves as long as
             # the vigilantes and vampires are all dead
@@ -583,7 +671,15 @@ class PactBreakerMode(GameMode):
             evt.data["winner"] = Vampire_Team
             evt.data["message"] = messages["pactbreaker_vampire_win"]
 
-    def on_team_win(self, evt: Event, var: GameState, player: User, main_role: str, all_roles: Iterable[str], winner: Category):
+    def on_team_win(
+        self,
+        evt: Event,
+        var: GameState,
+        player: User,
+        main_role: str,
+        all_roles: Iterable[str],
+        winner: Category,
+    ):
         if winner is Wolfteam and main_role == "villager":
             evt.data["team_win"] = True
 
@@ -611,27 +707,27 @@ class PactBreakerMode(GameMode):
 
         player_role = get_main_role(var, wrapper.source)
         target_name = target_location.name
-        del self.killing[:wrapper.source:]
+        del self.killing[: wrapper.source :]
         self.visiting[wrapper.source] = target_location
-        wrapper.pm(messages["pactbreaker_visiting_{0}".format(target_location.name)])
+        wrapper.pm(messages[f"pactbreaker_visiting_{target_location.name}"])
 
         # relay to wolfchat/vampire chat as appropriate
-        relay_key = "pactbreaker_relay_visit_{0}".format(target_name)
+        relay_key = f"pactbreaker_relay_visit_{target_name}"
         if player_role in Wolf:
             # command is "kill" so that this is relayed even if gameplay.wolfchat.only_kill_command is true
-            send_wolfchat_message(var,
-                                  wrapper.source,
-                                  messages[relay_key].format(wrapper.source),
-                                  Wolf,
-                                  role="wolf",
-                                  command="kill")
+            send_wolfchat_message(
+                var,
+                wrapper.source,
+                messages[relay_key].format(wrapper.source),
+                Wolf,
+                role="wolf",
+                command="kill",
+            )
         elif player_role in Vampire:
             # same logic as wolfchat for why we use "bite" as the command here
-            send_vampire_chat_message(var,
-                                      wrapper.source,
-                                      messages[relay_key].format(wrapper.source),
-                                      Vampire,
-                                      cmd="bite")
+            send_vampire_chat_message(
+                var, wrapper.source, messages[relay_key].format(wrapper.source), Vampire, cmd="bite"
+            )
 
     def kill(self, wrapper: MessageDispatcher, message: str):
         """Kill a player in the stocks or that you have collected evidence on."""
@@ -695,11 +791,13 @@ class PactBreakerMode(GameMode):
         self.killing[wrapper.source] = target
         self.visiting[wrapper.source] = Limbo
         wrapper.pm(messages["vampire_bite"].format(target))
-        send_vampire_chat_message(var,
-                                  wrapper.source,
-                                  messages["vampire_bite_vampchat"].format(wrapper.source, target),
-                                  Vampire,
-                                  cmd="bite")
+        send_vampire_chat_message(
+            var,
+            wrapper.source,
+            messages["vampire_bite_vampchat"].format(wrapper.source, target),
+            Vampire,
+            cmd="bite",
+        )
 
     def observe(self, wrapper: MessageDispatcher, message: str):
         """Spend clue tokens to learn about a player's role, however some roles may give inaccurate results."""
@@ -733,7 +831,9 @@ class PactBreakerMode(GameMode):
     def identify(self, wrapper: MessageDispatcher, message: str):
         """Spend clue tokens to accurately learn about a player's role."""
         var = wrapper.game_state
-        target = get_target(wrapper, re.split(" +", message)[0], not_self_message="no_investigate_self")
+        target = get_target(
+            wrapper, re.split(" +", message)[0], not_self_message="no_investigate_self"
+        )
         if not target:
             return
 

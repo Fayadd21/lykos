@@ -1,26 +1,14 @@
 from __future__ import annotations
 
-import re
-import itertools
-import math
-from collections import defaultdict
-from typing import Optional
-
-from src import channels, users
-from src.functions import get_players, get_all_players, get_main_role, get_reveal_role, get_target
-from src.decorators import command
-from src.containers import UserList, UserSet, UserDict, DefaultUserDict
-from src.messages import messages
-from src.status import try_misdirection, try_exchange
 from src.events import Event, event_listener
 from src.gamestate import GameState
 from src.users import User
-from src.random import random
 
 # Skeleton file for new roles. Not all events are represented, only the most common ones.
 
 # Instead of using list, set or dict, please use UserList, UserSet or UserDict respectively
 # Please refer to the notes in src/containers.py for proper use
+
 
 # Add to evt.data["acted"] and evt.data["nightroles"] if this role can act during night
 # nightroles lists all Users who have this role and are capable of acting tonight
@@ -30,6 +18,7 @@ from src.random import random
 def on_chk_nightdone(evt: Event, var: GameState):
     pass
 
+
 # PM players who have this role with instructions
 # Set priority=2 if this is a main role, and priority=5 if this is a secondary role
 # (secondary roles are like gunner, assassin, etc. which by default stack on top of main roles)
@@ -37,27 +26,34 @@ def on_chk_nightdone(evt: Event, var: GameState):
 def on_transition_night_end(evt: Event, var: GameState):
     pass
 
+
 # Create initial role state and handle swapping roles with someone else
 # If two players have the same role and their state needs to be exchanged, don't do it here
 @event_listener("new_role")
-def on_new_role(evt: Event, var: GameState, player: User, old_role: Optional[str]):
+def on_new_role(evt: Event, var: GameState, player: User, old_role: str | None):
     pass
+
 
 # Swap role state for two players. Only called during an actual exchange
 @event_listener("swap_role_state")
 def on_swap_role_state(evt: Event, var: GameState, actor: User, target: User, role: str):
     pass
 
+
 # Update any game state which happens when player dies. If this role does things upon death,
 # ensure that you check death_triggers (it's a bool) before firing it.
 @event_listener("del_player")
-def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool):
+def on_del_player(
+    evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool
+):
     pass
+
 
 # Clear all game state. Called whenever the game ends.
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):
     pass
+
 
 # Gets metadata about this role; kind will be a str with one of the following values:
 # The 'var' parameter will be None for 'special_keys' and 'role_categories', a GameState otherwise
@@ -77,5 +73,5 @@ def on_reset(evt: Event, var: GameState):
 #                  evt.data["rolename"] = {"cat1", "cat2", ...} (the value is a set)
 #                  All roles must implement this kind of metadata.
 @event_listener("get_role_metadata")
-def on_get_role_metadata(evt: Event, var: Optional[GameState], kind: str):
+def on_get_role_metadata(evt: Event, var: GameState | None, kind: str):
     pass

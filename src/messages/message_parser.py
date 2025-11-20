@@ -1,12 +1,13 @@
 # Generated from D:/Code/lykos/src/messages\message_parser.g4 by ANTLR 4.8
-# encoding: utf-8
-from antlr4 import *
-from io import StringIO
 import sys
+from io import StringIO
+
+from antlr4 import *
+
 if sys.version_info[1] > 5:
-	from typing import TextIO
+    from typing import TextIO
 else:
-	from typing.io import TextIO
+    from typing.io import TextIO
 
 
 def serializedATN():
@@ -24,11 +25,11 @@ def serializedATN():
         buf.write("\r\17\16\17n\3\20\3\20\5\20s\n\20\3\21\3\21\3\21\3\21")
         buf.write("\3\21\3\22\6\22{\n\22\r\22\16\22|\3\23\3\23\5\23\u0081")
         buf.write("\n\23\3\23\2\2\24\2\4\6\b\n\f\16\20\22\24\26\30\32\34")
-        buf.write("\36 \"$\2\2\2\177\2&\3\2\2\2\4.\3\2\2\2\6\61\3\2\2\2\b")
+        buf.write('\36 "$\2\2\2\177\2&\3\2\2\2\4.\3\2\2\2\6\61\3\2\2\2\b')
         buf.write("\65\3\2\2\2\n<\3\2\2\2\fD\3\2\2\2\16F\3\2\2\2\20K\3\2")
         buf.write("\2\2\22Y\3\2\2\2\24_\3\2\2\2\26a\3\2\2\2\30d\3\2\2\2\32")
-        buf.write("i\3\2\2\2\34l\3\2\2\2\36r\3\2\2\2 t\3\2\2\2\"z\3\2\2\2")
-        buf.write("$\u0080\3\2\2\2&\'\5\4\3\2\'(\7\2\2\3(\3\3\2\2\2)-\7\3")
+        buf.write('i\3\2\2\2\34l\3\2\2\2\36r\3\2\2\2 t\3\2\2\2"z\3\2\2\2')
+        buf.write("$\u0080\3\2\2\2&'\5\4\3\2'(\7\2\2\3(\3\3\2\2\2)-\7\3")
         buf.write("\2\2*-\5\6\4\2+-\5\20\t\2,)\3\2\2\2,*\3\2\2\2,+\3\2\2")
         buf.write("\2-\60\3\2\2\2.,\3\2\2\2./\3\2\2\2/\5\3\2\2\2\60.\3\2")
         buf.write("\2\2\61\62\5\b\5\2\62\63\5\4\3\2\63\64\5\16\b\2\64\7\3")
@@ -47,33 +48,63 @@ def serializedATN():
         buf.write("\2\2\2ih\3\2\2\2j\33\3\2\2\2km\5\36\20\2lk\3\2\2\2mn\3")
         buf.write("\2\2\2nl\3\2\2\2no\3\2\2\2o\35\3\2\2\2ps\7\20\2\2qs\5")
         buf.write("\20\t\2rp\3\2\2\2rq\3\2\2\2s\37\3\2\2\2tu\7\20\2\2uv\7")
-        buf.write("\21\2\2vw\5\"\22\2wx\7\23\2\2x!\3\2\2\2y{\5$\23\2zy\3")
+        buf.write('\21\2\2vw\5"\22\2wx\7\23\2\2x!\3\2\2\2y{\5$\23\2zy\3')
         buf.write("\2\2\2{|\3\2\2\2|z\3\2\2\2|}\3\2\2\2}#\3\2\2\2~\u0081")
         buf.write("\7\22\2\2\177\u0081\5\20\t\2\u0080~\3\2\2\2\u0080\177")
         buf.write("\3\2\2\2\u0081%\3\2\2\2\20,.8@DNS[_inr|\u0080")
         return buf.getvalue()
 
 
-class message_parser ( Parser ):
-
+class message_parser(Parser):
     grammarFileName = "message_parser.g4"
 
     atn = ATNDeserializer().deserialize(serializedATN())
 
-    decisionsToDFA = [ DFA(ds, i) for i, ds in enumerate(atn.decisionToState) ]
+    decisionsToDFA = [DFA(ds, i) for i, ds in enumerate(atn.decisionToState)]
 
     sharedContextCache = PredictionContextCache()
 
-    literalNames = [ "<INVALID>", "<INVALID>", "'['", "'{'", "<INVALID>", 
-                     "'/'", "'='", "<INVALID>", "<INVALID>", "<INVALID>", 
-                     "'!'", "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
-                     "'('", "<INVALID>", "')'" ]
+    literalNames = [
+        "<INVALID>",
+        "<INVALID>",
+        "'['",
+        "'{'",
+        "<INVALID>",
+        "'/'",
+        "'='",
+        "<INVALID>",
+        "<INVALID>",
+        "<INVALID>",
+        "'!'",
+        "<INVALID>",
+        "<INVALID>",
+        "<INVALID>",
+        "<INVALID>",
+        "'('",
+        "<INVALID>",
+        "')'",
+    ]
 
-    symbolicNames = [ "<INVALID>", "TEXT", "OPEN_TAG", "OPEN_SUB", "TAG_NAME", 
-                      "TAG_SLASH", "TAG_SEP", "CLOSE_TAG", "TAG_PARAM", 
-                      "SUB_FIELD", "SUB_CONVERT", "SUB_SPEC", "CLOSE_SUB", 
-                      "SUB_IDENTIFIER", "SPEC_VALUE", "OPEN_ARGLIST", "ARGLIST_VALUE", 
-                      "CLOSE_ARGLIST" ]
+    symbolicNames = [
+        "<INVALID>",
+        "TEXT",
+        "OPEN_TAG",
+        "OPEN_SUB",
+        "TAG_NAME",
+        "TAG_SLASH",
+        "TAG_SEP",
+        "CLOSE_TAG",
+        "TAG_PARAM",
+        "SUB_FIELD",
+        "SUB_CONVERT",
+        "SUB_SPEC",
+        "CLOSE_SUB",
+        "SUB_IDENTIFIER",
+        "SPEC_VALUE",
+        "OPEN_ARGLIST",
+        "ARGLIST_VALUE",
+        "CLOSE_ARGLIST",
+    ]
 
     RULE_main = 0
     RULE_string = 1
@@ -94,48 +125,61 @@ class message_parser ( Parser ):
     RULE_spec_func_arg = 16
     RULE_spec_func_arg_frag = 17
 
-    ruleNames =  [ "main", "string", "tag", "open_tag", "tag_param", "tag_param_frag", 
-                   "close_tag", "sub", "sub_field", "sub_field_frag", "sub_convert", 
-                   "sub_spec", "spec_value", "spec_literal", "spec_literal_frag", 
-                   "spec_func", "spec_func_arg", "spec_func_arg_frag" ]
+    ruleNames = [
+        "main",
+        "string",
+        "tag",
+        "open_tag",
+        "tag_param",
+        "tag_param_frag",
+        "close_tag",
+        "sub",
+        "sub_field",
+        "sub_field_frag",
+        "sub_convert",
+        "sub_spec",
+        "spec_value",
+        "spec_literal",
+        "spec_literal_frag",
+        "spec_func",
+        "spec_func_arg",
+        "spec_func_arg_frag",
+    ]
 
     EOF = Token.EOF
-    TEXT=1
-    OPEN_TAG=2
-    OPEN_SUB=3
-    TAG_NAME=4
-    TAG_SLASH=5
-    TAG_SEP=6
-    CLOSE_TAG=7
-    TAG_PARAM=8
-    SUB_FIELD=9
-    SUB_CONVERT=10
-    SUB_SPEC=11
-    CLOSE_SUB=12
-    SUB_IDENTIFIER=13
-    SPEC_VALUE=14
-    OPEN_ARGLIST=15
-    ARGLIST_VALUE=16
-    CLOSE_ARGLIST=17
+    TEXT = 1
+    OPEN_TAG = 2
+    OPEN_SUB = 3
+    TAG_NAME = 4
+    TAG_SLASH = 5
+    TAG_SEP = 6
+    CLOSE_TAG = 7
+    TAG_PARAM = 8
+    SUB_FIELD = 9
+    SUB_CONVERT = 10
+    SUB_SPEC = 11
+    CLOSE_SUB = 12
+    SUB_IDENTIFIER = 13
+    SPEC_VALUE = 14
+    OPEN_ARGLIST = 15
+    ARGLIST_VALUE = 16
+    CLOSE_ARGLIST = 17
 
-    def __init__(self, input:TokenStream, output:TextIO = sys.stdout):
+    def __init__(self, input: TokenStream, output: TextIO = sys.stdout):
         super().__init__(input, output)
         self.checkVersion("4.8")
-        self._interp = ParserATNSimulator(self, self.atn, self.decisionsToDFA, self.sharedContextCache)
+        self._interp = ParserATNSimulator(
+            self, self.atn, self.decisionsToDFA, self.sharedContextCache
+        )
         self._predicates = None
 
-
-
-
     class MainContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
         def string(self):
-            return self.getTypedRuleContext(message_parser.StringContext,0)
-
+            return self.getTypedRuleContext(message_parser.StringContext, 0)
 
         def EOF(self):
             return self.getToken(message_parser.EOF, 0)
@@ -143,19 +187,15 @@ class message_parser ( Parser ):
         def getRuleIndex(self):
             return message_parser.RULE_main
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterMain" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterMain"):
                 listener.enterMain(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitMain" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitMain"):
                 listener.exitMain(self)
 
-
-
-
     def main(self):
-
         localctx = message_parser.MainContext(self, self._ctx, self.state)
         self.enterRule(localctx, 0, self.RULE_main)
         try:
@@ -172,58 +212,50 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class StringContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def TEXT(self, i:int=None):
+        def TEXT(self, i: int = None):
             if i is None:
                 return self.getTokens(message_parser.TEXT)
             else:
                 return self.getToken(message_parser.TEXT, i)
 
-        def tag(self, i:int=None):
+        def tag(self, i: int = None):
             if i is None:
                 return self.getTypedRuleContexts(message_parser.TagContext)
             else:
-                return self.getTypedRuleContext(message_parser.TagContext,i)
+                return self.getTypedRuleContext(message_parser.TagContext, i)
 
-
-        def sub(self, i:int=None):
+        def sub(self, i: int = None):
             if i is None:
                 return self.getTypedRuleContexts(message_parser.SubContext)
             else:
-                return self.getTypedRuleContext(message_parser.SubContext,i)
-
+                return self.getTypedRuleContext(message_parser.SubContext, i)
 
         def getRuleIndex(self):
             return message_parser.RULE_string
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterString" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterString"):
                 listener.enterString(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitString" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitString"):
                 listener.exitString(self)
 
-
-
-
     def string(self):
-
         localctx = message_parser.StringContext(self, self._ctx, self.state)
         self.enterRule(localctx, 2, self.RULE_string)
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 44
             self._errHandler.sync(self)
-            _alt = self._interp.adaptivePredict(self._input,1,self._ctx)
-            while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
-                if _alt==1:
+            _alt = self._interp.adaptivePredict(self._input, 1, self._ctx)
+            while _alt != 2 and _alt != ATN.INVALID_ALT_NUMBER:
+                if _alt == 1:
                     self.state = 42
                     self._errHandler.sync(self)
                     token = self._input.LA(1)
@@ -241,10 +273,10 @@ class message_parser ( Parser ):
                         pass
                     else:
                         raise NoViableAltException(self)
-             
+
                 self.state = 46
                 self._errHandler.sync(self)
-                _alt = self._interp.adaptivePredict(self._input,1,self._ctx)
+                _alt = self._interp.adaptivePredict(self._input, 1, self._ctx)
 
         except RecognitionException as re:
             localctx.exception = re
@@ -254,41 +286,32 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class TagContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
         def open_tag(self):
-            return self.getTypedRuleContext(message_parser.Open_tagContext,0)
-
+            return self.getTypedRuleContext(message_parser.Open_tagContext, 0)
 
         def string(self):
-            return self.getTypedRuleContext(message_parser.StringContext,0)
-
+            return self.getTypedRuleContext(message_parser.StringContext, 0)
 
         def close_tag(self):
-            return self.getTypedRuleContext(message_parser.Close_tagContext,0)
-
+            return self.getTypedRuleContext(message_parser.Close_tagContext, 0)
 
         def getRuleIndex(self):
             return message_parser.RULE_tag
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterTag" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterTag"):
                 listener.enterTag(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitTag" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitTag"):
                 listener.exitTag(self)
 
-
-
-
     def tag(self):
-
         localctx = message_parser.TagContext(self, self._ctx, self.state)
         self.enterRule(localctx, 4, self.RULE_tag)
         try:
@@ -307,10 +330,8 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Open_tagContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -324,28 +345,23 @@ class message_parser ( Parser ):
             return self.getToken(message_parser.CLOSE_TAG, 0)
 
         def tag_param(self):
-            return self.getTypedRuleContext(message_parser.Tag_paramContext,0)
-
+            return self.getTypedRuleContext(message_parser.Tag_paramContext, 0)
 
         def getRuleIndex(self):
             return message_parser.RULE_open_tag
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterOpen_tag" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterOpen_tag"):
                 listener.enterOpen_tag(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitOpen_tag" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitOpen_tag"):
                 listener.exitOpen_tag(self)
 
-
-
-
     def open_tag(self):
-
         localctx = message_parser.Open_tagContext(self, self._ctx, self.state)
         self.enterRule(localctx, 6, self.RULE_open_tag)
-        self._la = 0 # Token type
+        self._la = 0  # Token type
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 51
@@ -355,10 +371,9 @@ class message_parser ( Parser ):
             self.state = 54
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if _la==message_parser.TAG_SEP:
+            if _la == message_parser.TAG_SEP:
                 self.state = 53
                 self.tag_param()
-
 
             self.state = 56
             self.match(message_parser.CLOSE_TAG)
@@ -370,56 +385,49 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Tag_paramContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
         def TAG_SEP(self):
             return self.getToken(message_parser.TAG_SEP, 0)
 
-        def tag_param_frag(self, i:int=None):
+        def tag_param_frag(self, i: int = None):
             if i is None:
                 return self.getTypedRuleContexts(message_parser.Tag_param_fragContext)
             else:
-                return self.getTypedRuleContext(message_parser.Tag_param_fragContext,i)
-
+                return self.getTypedRuleContext(message_parser.Tag_param_fragContext, i)
 
         def getRuleIndex(self):
             return message_parser.RULE_tag_param
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterTag_param" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterTag_param"):
                 listener.enterTag_param(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitTag_param" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitTag_param"):
                 listener.exitTag_param(self)
 
-
-
-
     def tag_param(self):
-
         localctx = message_parser.Tag_paramContext(self, self._ctx, self.state)
         self.enterRule(localctx, 8, self.RULE_tag_param)
-        self._la = 0 # Token type
+        self._la = 0  # Token type
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 58
             self.match(message_parser.TAG_SEP)
-            self.state = 60 
+            self.state = 60
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while True:
                 self.state = 59
                 self.tag_param_frag()
-                self.state = 62 
+                self.state = 62
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                if not (_la==message_parser.OPEN_SUB or _la==message_parser.TAG_PARAM):
+                if not (_la == message_parser.OPEN_SUB or _la == message_parser.TAG_PARAM):
                     break
 
         except RecognitionException as re:
@@ -430,10 +438,8 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Tag_param_fragContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -441,25 +447,20 @@ class message_parser ( Parser ):
             return self.getToken(message_parser.TAG_PARAM, 0)
 
         def sub(self):
-            return self.getTypedRuleContext(message_parser.SubContext,0)
-
+            return self.getTypedRuleContext(message_parser.SubContext, 0)
 
         def getRuleIndex(self):
             return message_parser.RULE_tag_param_frag
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterTag_param_frag" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterTag_param_frag"):
                 listener.enterTag_param_frag(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitTag_param_frag" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitTag_param_frag"):
                 listener.exitTag_param_frag(self)
 
-
-
-
     def tag_param_frag(self):
-
         localctx = message_parser.Tag_param_fragContext(self, self._ctx, self.state)
         self.enterRule(localctx, 10, self.RULE_tag_param_frag)
         try:
@@ -487,10 +488,8 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Close_tagContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -509,19 +508,15 @@ class message_parser ( Parser ):
         def getRuleIndex(self):
             return message_parser.RULE_close_tag
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterClose_tag" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterClose_tag"):
                 listener.enterClose_tag(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitClose_tag" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitClose_tag"):
                 listener.exitClose_tag(self)
 
-
-
-
     def close_tag(self):
-
         localctx = message_parser.Close_tagContext(self, self._ctx, self.state)
         self.enterRule(localctx, 12, self.RULE_close_tag)
         try:
@@ -542,10 +537,8 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class SubContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -553,42 +546,35 @@ class message_parser ( Parser ):
             return self.getToken(message_parser.OPEN_SUB, 0)
 
         def sub_field(self):
-            return self.getTypedRuleContext(message_parser.Sub_fieldContext,0)
-
+            return self.getTypedRuleContext(message_parser.Sub_fieldContext, 0)
 
         def CLOSE_SUB(self):
             return self.getToken(message_parser.CLOSE_SUB, 0)
 
         def sub_convert(self):
-            return self.getTypedRuleContext(message_parser.Sub_convertContext,0)
+            return self.getTypedRuleContext(message_parser.Sub_convertContext, 0)
 
-
-        def sub_spec(self, i:int=None):
+        def sub_spec(self, i: int = None):
             if i is None:
                 return self.getTypedRuleContexts(message_parser.Sub_specContext)
             else:
-                return self.getTypedRuleContext(message_parser.Sub_specContext,i)
-
+                return self.getTypedRuleContext(message_parser.Sub_specContext, i)
 
         def getRuleIndex(self):
             return message_parser.RULE_sub
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterSub" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterSub"):
                 listener.enterSub(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitSub" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitSub"):
                 listener.exitSub(self)
 
-
-
-
     def sub(self):
-
         localctx = message_parser.SubContext(self, self._ctx, self.state)
         self.enterRule(localctx, 14, self.RULE_sub)
-        self._la = 0 # Token type
+        self._la = 0  # Token type
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 73
@@ -598,15 +584,14 @@ class message_parser ( Parser ):
             self.state = 76
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if _la==message_parser.SUB_CONVERT:
+            if _la == message_parser.SUB_CONVERT:
                 self.state = 75
                 self.sub_convert()
-
 
             self.state = 81
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            while _la==message_parser.SUB_SPEC:
+            while _la == message_parser.SUB_SPEC:
                 self.state = 78
                 self.sub_spec()
                 self.state = 83
@@ -623,51 +608,44 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Sub_fieldContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def sub_field_frag(self, i:int=None):
+        def sub_field_frag(self, i: int = None):
             if i is None:
                 return self.getTypedRuleContexts(message_parser.Sub_field_fragContext)
             else:
-                return self.getTypedRuleContext(message_parser.Sub_field_fragContext,i)
-
+                return self.getTypedRuleContext(message_parser.Sub_field_fragContext, i)
 
         def getRuleIndex(self):
             return message_parser.RULE_sub_field
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterSub_field" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterSub_field"):
                 listener.enterSub_field(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitSub_field" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitSub_field"):
                 listener.exitSub_field(self)
 
-
-
-
     def sub_field(self):
-
         localctx = message_parser.Sub_fieldContext(self, self._ctx, self.state)
         self.enterRule(localctx, 16, self.RULE_sub_field)
-        self._la = 0 # Token type
+        self._la = 0  # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 87 
+            self.state = 87
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while True:
                 self.state = 86
                 self.sub_field_frag()
-                self.state = 89 
+                self.state = 89
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                if not (_la==message_parser.OPEN_SUB or _la==message_parser.SUB_FIELD):
+                if not (_la == message_parser.OPEN_SUB or _la == message_parser.SUB_FIELD):
                     break
 
         except RecognitionException as re:
@@ -678,10 +656,8 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Sub_field_fragContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -689,25 +665,20 @@ class message_parser ( Parser ):
             return self.getToken(message_parser.SUB_FIELD, 0)
 
         def sub(self):
-            return self.getTypedRuleContext(message_parser.SubContext,0)
-
+            return self.getTypedRuleContext(message_parser.SubContext, 0)
 
         def getRuleIndex(self):
             return message_parser.RULE_sub_field_frag
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterSub_field_frag" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterSub_field_frag"):
                 listener.enterSub_field_frag(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitSub_field_frag" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitSub_field_frag"):
                 listener.exitSub_field_frag(self)
 
-
-
-
     def sub_field_frag(self):
-
         localctx = message_parser.Sub_field_fragContext(self, self._ctx, self.state)
         self.enterRule(localctx, 18, self.RULE_sub_field_frag)
         try:
@@ -735,10 +706,8 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Sub_convertContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -751,19 +720,15 @@ class message_parser ( Parser ):
         def getRuleIndex(self):
             return message_parser.RULE_sub_convert
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterSub_convert" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterSub_convert"):
                 listener.enterSub_convert(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitSub_convert" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitSub_convert"):
                 listener.exitSub_convert(self)
 
-
-
-
     def sub_convert(self):
-
         localctx = message_parser.Sub_convertContext(self, self._ctx, self.state)
         self.enterRule(localctx, 20, self.RULE_sub_convert)
         try:
@@ -780,10 +745,8 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Sub_specContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -791,25 +754,20 @@ class message_parser ( Parser ):
             return self.getToken(message_parser.SUB_SPEC, 0)
 
         def spec_value(self):
-            return self.getTypedRuleContext(message_parser.Spec_valueContext,0)
-
+            return self.getTypedRuleContext(message_parser.Spec_valueContext, 0)
 
         def getRuleIndex(self):
             return message_parser.RULE_sub_spec
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterSub_spec" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterSub_spec"):
                 listener.enterSub_spec(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitSub_spec" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitSub_spec"):
                 listener.exitSub_spec(self)
 
-
-
-
     def sub_spec(self):
-
         localctx = message_parser.Sub_specContext(self, self._ctx, self.state)
         self.enterRule(localctx, 22, self.RULE_sub_spec)
         try:
@@ -826,43 +784,35 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Spec_valueContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
         def spec_func(self):
-            return self.getTypedRuleContext(message_parser.Spec_funcContext,0)
-
+            return self.getTypedRuleContext(message_parser.Spec_funcContext, 0)
 
         def spec_literal(self):
-            return self.getTypedRuleContext(message_parser.Spec_literalContext,0)
-
+            return self.getTypedRuleContext(message_parser.Spec_literalContext, 0)
 
         def getRuleIndex(self):
             return message_parser.RULE_spec_value
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterSpec_value" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterSpec_value"):
                 listener.enterSpec_value(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitSpec_value" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitSpec_value"):
                 listener.exitSpec_value(self)
 
-
-
-
     def spec_value(self):
-
         localctx = message_parser.Spec_valueContext(self, self._ctx, self.state)
         self.enterRule(localctx, 24, self.RULE_spec_value)
         try:
             self.state = 103
             self._errHandler.sync(self)
-            la_ = self._interp.adaptivePredict(self._input,9,self._ctx)
+            la_ = self._interp.adaptivePredict(self._input, 9, self._ctx)
             if la_ == 1:
                 self.enterOuterAlt(localctx, 1)
                 self.state = 101
@@ -875,7 +825,6 @@ class message_parser ( Parser ):
                 self.spec_literal()
                 pass
 
-
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -884,51 +833,44 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Spec_literalContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def spec_literal_frag(self, i:int=None):
+        def spec_literal_frag(self, i: int = None):
             if i is None:
                 return self.getTypedRuleContexts(message_parser.Spec_literal_fragContext)
             else:
-                return self.getTypedRuleContext(message_parser.Spec_literal_fragContext,i)
-
+                return self.getTypedRuleContext(message_parser.Spec_literal_fragContext, i)
 
         def getRuleIndex(self):
             return message_parser.RULE_spec_literal
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterSpec_literal" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterSpec_literal"):
                 listener.enterSpec_literal(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitSpec_literal" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitSpec_literal"):
                 listener.exitSpec_literal(self)
 
-
-
-
     def spec_literal(self):
-
         localctx = message_parser.Spec_literalContext(self, self._ctx, self.state)
         self.enterRule(localctx, 26, self.RULE_spec_literal)
-        self._la = 0 # Token type
+        self._la = 0  # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 106 
+            self.state = 106
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while True:
                 self.state = 105
                 self.spec_literal_frag()
-                self.state = 108 
+                self.state = 108
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                if not (_la==message_parser.OPEN_SUB or _la==message_parser.SPEC_VALUE):
+                if not (_la == message_parser.OPEN_SUB or _la == message_parser.SPEC_VALUE):
                     break
 
         except RecognitionException as re:
@@ -939,10 +881,8 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Spec_literal_fragContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -950,25 +890,20 @@ class message_parser ( Parser ):
             return self.getToken(message_parser.SPEC_VALUE, 0)
 
         def sub(self):
-            return self.getTypedRuleContext(message_parser.SubContext,0)
-
+            return self.getTypedRuleContext(message_parser.SubContext, 0)
 
         def getRuleIndex(self):
             return message_parser.RULE_spec_literal_frag
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterSpec_literal_frag" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterSpec_literal_frag"):
                 listener.enterSpec_literal_frag(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitSpec_literal_frag" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitSpec_literal_frag"):
                 listener.exitSpec_literal_frag(self)
 
-
-
-
     def spec_literal_frag(self):
-
         localctx = message_parser.Spec_literal_fragContext(self, self._ctx, self.state)
         self.enterRule(localctx, 28, self.RULE_spec_literal_frag)
         try:
@@ -996,10 +931,8 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Spec_funcContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -1010,8 +943,7 @@ class message_parser ( Parser ):
             return self.getToken(message_parser.OPEN_ARGLIST, 0)
 
         def spec_func_arg(self):
-            return self.getTypedRuleContext(message_parser.Spec_func_argContext,0)
-
+            return self.getTypedRuleContext(message_parser.Spec_func_argContext, 0)
 
         def CLOSE_ARGLIST(self):
             return self.getToken(message_parser.CLOSE_ARGLIST, 0)
@@ -1019,19 +951,15 @@ class message_parser ( Parser ):
         def getRuleIndex(self):
             return message_parser.RULE_spec_func
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterSpec_func" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterSpec_func"):
                 listener.enterSpec_func(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitSpec_func" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitSpec_func"):
                 listener.exitSpec_func(self)
 
-
-
-
     def spec_func(self):
-
         localctx = message_parser.Spec_funcContext(self, self._ctx, self.state)
         self.enterRule(localctx, 30, self.RULE_spec_func)
         try:
@@ -1052,51 +980,44 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Spec_func_argContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def spec_func_arg_frag(self, i:int=None):
+        def spec_func_arg_frag(self, i: int = None):
             if i is None:
                 return self.getTypedRuleContexts(message_parser.Spec_func_arg_fragContext)
             else:
-                return self.getTypedRuleContext(message_parser.Spec_func_arg_fragContext,i)
-
+                return self.getTypedRuleContext(message_parser.Spec_func_arg_fragContext, i)
 
         def getRuleIndex(self):
             return message_parser.RULE_spec_func_arg
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterSpec_func_arg" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterSpec_func_arg"):
                 listener.enterSpec_func_arg(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitSpec_func_arg" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitSpec_func_arg"):
                 listener.exitSpec_func_arg(self)
 
-
-
-
     def spec_func_arg(self):
-
         localctx = message_parser.Spec_func_argContext(self, self._ctx, self.state)
         self.enterRule(localctx, 32, self.RULE_spec_func_arg)
-        self._la = 0 # Token type
+        self._la = 0  # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 120 
+            self.state = 120
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while True:
                 self.state = 119
                 self.spec_func_arg_frag()
-                self.state = 122 
+                self.state = 122
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                if not (_la==message_parser.OPEN_SUB or _la==message_parser.ARGLIST_VALUE):
+                if not (_la == message_parser.OPEN_SUB or _la == message_parser.ARGLIST_VALUE):
                     break
 
         except RecognitionException as re:
@@ -1107,10 +1028,8 @@ class message_parser ( Parser ):
             self.exitRule()
         return localctx
 
-
     class Spec_func_arg_fragContext(ParserRuleContext):
-
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent: ParserRuleContext = None, invokingState: int = -1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -1118,25 +1037,20 @@ class message_parser ( Parser ):
             return self.getToken(message_parser.ARGLIST_VALUE, 0)
 
         def sub(self):
-            return self.getTypedRuleContext(message_parser.SubContext,0)
-
+            return self.getTypedRuleContext(message_parser.SubContext, 0)
 
         def getRuleIndex(self):
             return message_parser.RULE_spec_func_arg_frag
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterSpec_func_arg_frag" ):
+        def enterRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "enterSpec_func_arg_frag"):
                 listener.enterSpec_func_arg_frag(self)
 
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitSpec_func_arg_frag" ):
+        def exitRule(self, listener: ParseTreeListener):
+            if hasattr(listener, "exitSpec_func_arg_frag"):
                 listener.exitSpec_func_arg_frag(self)
 
-
-
-
     def spec_func_arg_frag(self):
-
         localctx = message_parser.Spec_func_arg_fragContext(self, self._ctx, self.state)
         self.enterRule(localctx, 34, self.RULE_spec_func_arg_frag)
         try:
@@ -1163,8 +1077,3 @@ class message_parser ( Parser ):
         finally:
             self.exitRule()
         return localctx
-
-
-
-
-

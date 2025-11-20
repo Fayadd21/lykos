@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Optional
 
 from src import config
 from src.messages.message import Message
 
 MESSAGES_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "messages")
 ROOT_DIR = os.path.join(os.path.dirname(__file__), "..", "..")
+
 
 class Messages:
     def __init__(self, *, override=None):
@@ -21,12 +21,12 @@ class Messages:
         self.overrides = {}
         self._load_messages()
 
-    def get(self, key, index=None) -> Optional[Message]:
+    def get(self, key, index=None) -> Message | None:
         actual_key = self.overrides[key] if key in self.overrides else key
         if actual_key is None:
             return None
         if actual_key not in self.messages:
-            raise KeyError("Key {0!r} does not exist! Add it to messages.json".format(actual_key))
+            raise KeyError(f"Key {actual_key!r} does not exist! Add it to messages.json")
         return Message(actual_key, self.messages[actual_key], index)
 
     __getitem__ = get
@@ -38,8 +38,10 @@ class Messages:
 
         return m
 
-    def get_role_mapping(self, reverse: bool = False, remove_spaces: bool = False) -> dict[str, str]:
-        """ Retrieve a mapping between internal role names and localized role names.
+    def get_role_mapping(
+        self, reverse: bool = False, remove_spaces: bool = False
+    ) -> dict[str, str]:
+        """Retrieve a mapping between internal role names and localized role names.
 
         :param reverse: If True, maps localized role names and aliases to internal role names.
             If False, maps internal role names to the singular localized version of that name.
@@ -81,8 +83,10 @@ class Messages:
         self.cache[cache_key] = roles
         return roles
 
-    def get_mode_mapping(self, reverse: bool = False, remove_spaces: bool = False) -> dict[str, str]:
-        """ Retrieve a mapping between internal mode names and localized mode names.
+    def get_mode_mapping(
+        self, reverse: bool = False, remove_spaces: bool = False
+    ) -> dict[str, str]:
+        """Retrieve a mapping between internal mode names and localized mode names.
 
         :param reverse: If True, maps localized mode names to internal mode names.
             If False, maps internal mode names to the localized version of that name.
@@ -109,7 +113,7 @@ class Messages:
         return modes
 
     def get_totem_mapping(self, reverse: bool = False) -> dict[str, str]:
-        """ Retrieve a mapping between internal totem names and localized totem names.
+        """Retrieve a mapping between internal totem names and localized totem names.
 
         :param reverse: If True, maps localized totem names to internal totem names.
             If False, maps internal totem names to the localized version of that name.
@@ -160,11 +164,13 @@ class Messages:
             if key in self.messages:
                 if isinstance(self.messages[key], dict):
                     if not isinstance(message, dict):
-                        raise TypeError("messages.json: Key {0!r} must be of type dict".format(key))
+                        raise TypeError(f"messages.json: Key {key!r} must be of type dict")
                     self.messages[key].update(message)
                 elif isinstance(self.messages[key], list):
                     if not isinstance(message, (list, dict)):
-                        raise TypeError("messages.json: Key {0!r} must be of type list or dict (with merge_strategy and value keys)".format(key))
+                        raise TypeError(
+                            f"messages.json: Key {key!r} must be of type list or dict (with merge_strategy and value keys)"
+                        )
 
                     if isinstance(message, list):
                         self.messages[key] = message
@@ -174,8 +180,9 @@ class Messages:
                         self.messages[key] = message["value"]
                 else:
                     if not isinstance(message, type(self.messages[key])):
-                        raise TypeError("messages.json: Key {0!r} must be of type {1!r}".format(key, type(
-                            self.messages[key]).__name__))
+                        raise TypeError(
+                            f"messages.json: Key {key!r} must be of type {type(self.messages[key]).__name__!r}"
+                        )
                     self.messages[key] = message
             else:
                 self.messages[key] = message

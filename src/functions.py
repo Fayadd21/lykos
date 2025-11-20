@@ -1,29 +1,38 @@
 from __future__ import annotations
 
-from typing import Optional, Iterable, Callable
-from collections import Counter
 import functools
 import typing
+from collections import Counter
+from collections.abc import Callable, Iterable
 
-from src.messages import messages, LocalRole, LocalMode, LocalTotem
-from src.gamestate import PregameState, GameState
+from src.cats import All, Hidden, get_team
 from src.events import Event
-from src.cats import Wolfteam, Neutral, Hidden, All, get_team
+from src.gamestate import GameState, PregameState
 from src.match import Match, match_all
+from src.messages import LocalMode, LocalRole, LocalTotem, messages
 
 if typing.TYPE_CHECKING:
     from src.dispatcher import MessageDispatcher
     from src.users import User
 
 __all__ = [
-    "get_players", "get_all_players", "get_participants",
-    "get_target", "change_role",
-    "get_main_role", "get_all_roles", "get_reveal_role",
-    "match_role", "match_mode", "match_totem"
-    ]
+    "get_players",
+    "get_all_players",
+    "get_participants",
+    "get_target",
+    "change_role",
+    "get_main_role",
+    "get_all_roles",
+    "get_reveal_role",
+    "match_role",
+    "match_mode",
+    "match_totem",
+]
 
-def get_players(var: Optional[GameState | PregameState], roles=None, *, mainroles=None) -> list[User]:
+
+def get_players(var: GameState | PregameState | None, roles=None, *, mainroles=None) -> list[User]:
     from src.status import is_dying
+
     if var is None:
         return []
     if isinstance(var, PregameState):
@@ -46,8 +55,10 @@ def get_players(var: Optional[GameState | PregameState], roles=None, *, mainrole
         return list(pl)
     return [p for p in var.players if p in pl and not is_dying(var, p)]
 
-def get_all_players(var: Optional[GameState | PregameState], roles=None, *, rolemap=None) -> set[User]:
+
+def get_all_players(var: GameState | PregameState | None, roles=None, *, rolemap=None) -> set[User]:
     from src.status import is_dying
+
     if var is None:
         return set()
     if isinstance(var, PregameState):
@@ -69,19 +80,23 @@ def get_all_players(var: Optional[GameState | PregameState], roles=None, *, role
 
     return {p for p in pl if not is_dying(var, p)}
 
-def get_participants(var: Optional[GameState | PregameState]) -> list[User]:
+
+def get_participants(var: GameState | PregameState | None) -> list[User]:
     """List all players who are still able to participate in the game."""
     evt = Event("get_participants", {"players": get_players(var)})
     evt.dispatch(var)
     return evt.data["players"]
 
-def get_target(wrapper: MessageDispatcher,
-               message: str,
-               *,
-               allow_self: bool = False,
-               allow_bot: bool = False,
-               not_self_message: str = "no_target_self",
-               scope: Optional[Iterable[User]] = None) -> Optional[User]:
+
+def get_target(
+    wrapper: MessageDispatcher,
+    message: str,
+    *,
+    allow_self: bool = False,
+    allow_bot: bool = False,
+    not_self_message: str = "no_target_self",
+    scope: Iterable[User] | None = None,
+) -> User | None:
     """Autocomplete a target for an in-game command.
 
     :param wrapper: Message context
@@ -93,7 +108,8 @@ def get_target(wrapper: MessageDispatcher,
     :returns: The matched target, or None if no matches
     :rtype: Optional[User]
     """
-    from src import users # FIXME: we should move get_target elsewhere to avoid circular imports
+    from src import users  # FIXME: we should move get_target elsewhere to avoid circular imports
+
     if not message:
         wrapper.pm(messages["not_enough_parameters"])
         return
@@ -127,22 +143,25 @@ def get_target(wrapper: MessageDispatcher,
                     for user in match:
                         luser = user.lower()
                         if luser.nick == nick:
-                            suggestions.append("{0}:{1}".format(luser.nick, luser.account))
+                            suggestions.append(f"{luser.nick}:{luser.account}")
             suggestions.sort()
             wrapper.pm(messages["not_playing_suggestions"].format(message, suggestions))
         return
 
     return match.get()
 
-def change_role(var: GameState,
-                player: User,
-                old_role: str,
-                new_role: str,
-                *,
-                inherit_from=None,
-                message="new_role",
-                send_messages=True) -> tuple[str, list[str | Callable[[], str]]]:
-    """ Change the player's main role, updating relevant game state.
+
+def change_role(
+    var: GameState,
+    player: User,
+    old_role: str,
+    new_role: str,
+    *,
+    inherit_from=None,
+    message="new_role",
+    send_messages=True,
+) -> tuple[str, list[str | Callable[[], str]]]:
+    """Change the player's main role, updating relevant game state.
 
     :param var: Game state
     :param player: Player whose role is being changed
@@ -158,9 +177,11 @@ def change_role(var: GameState,
     """
     # in_wolfchat is filled as part of priority 4
     # if you wish to modify evt.data["role"], do so in priority 3 or sooner
-    evt = Event("new_role",
-                {"role": new_role, "messages": [], "in_wolfchat": False},
-                inherit_from=inherit_from)
+    evt = Event(
+        "new_role",
+        {"role": new_role, "messages": [], "in_wolfchat": False},
+        inherit_from=inherit_from,
+    )
     evt.dispatch(var, player, old_role)
     new_role = evt.data["role"]
 
@@ -173,6 +194,7 @@ def change_role(var: GameState,
 
     # if giving the player a new role during night, don't warn them for not acting
     from src.trans import NIGHT_IDLE_EXEMPT
+
     NIGHT_IDLE_EXEMPT.add(player)
 
     say_role = new_role
@@ -186,6 +208,7 @@ def change_role(var: GameState,
 
     return new_role, evt.data["messages"]
 
+
 def get_main_role(var: GameState, user, *, mainroles=None):
     if mainroles is None:
         mainroles = var.main_roles
@@ -198,13 +221,15 @@ def get_main_role(var: GameState, user, *, mainroles=None):
         evt.dispatch(var, user)
         role = evt.data["role"]
     if role is None:
-        raise ValueError("User {0} isn't playing and has no defined participant role".format(user))
+        raise ValueError(f"User {user} isn't playing and has no defined participant role")
     return role
+
 
 def get_all_roles(var: GameState, user: User, *, rolemap=None) -> set[str]:
     if rolemap is None:
         rolemap = var.roles
     return {role for role, users in rolemap.items() if user in users}
+
 
 def get_reveal_role(var: GameState, user, *, mainroles=None) -> str:
     evt = Event("get_reveal_role", {"role": get_main_role(var, user, mainroles=mainroles)})
@@ -213,8 +238,15 @@ def get_reveal_role(var: GameState, user, *, mainroles=None) -> str:
 
     return role if var.role_reveal != "team" else get_team(var, role).name
 
-def match_role(role: str, remove_spaces: bool = False, allow_extra: bool = False, allow_special: bool = True, scope: Optional[Iterable[str]] = None) -> Match[LocalRole]:
-    """ Match a partial role or alias name into the internal role key.
+
+def match_role(
+    role: str,
+    remove_spaces: bool = False,
+    allow_extra: bool = False,
+    allow_special: bool = True,
+    scope: Iterable[str] | None = None,
+) -> Match[LocalRole]:
+    """Match a partial role or alias name into the internal role key.
 
     :param role: Partial role to match on
     :param remove_spaces: Whether to remove all spaces before matching.
@@ -255,8 +287,14 @@ def match_role(role: str, remove_spaces: bool = False, allow_extra: bool = False
 
     return Match(filtered_matches)
 
-def match_mode(mode: str, remove_spaces: bool = False, allow_extra: bool = False, scope: Optional[Iterable[str]] = None) -> Match[LocalMode]:
-    """ Match a partial game mode into the internal game mode key.
+
+def match_mode(
+    mode: str,
+    remove_spaces: bool = False,
+    allow_extra: bool = False,
+    scope: Iterable[str] | None = None,
+) -> Match[LocalMode]:
+    """Match a partial game mode into the internal game mode key.
 
     :param mode: Partial game mode to match on
     :param remove_spaces: Whether to remove all spaces before matching.
@@ -282,6 +320,7 @@ def match_mode(mode: str, remove_spaces: bool = False, allow_extra: bool = False
         allowed = set(mode_map.values())
     else:
         from src.gamemodes import GAME_MODES
+
         allowed = set(GAME_MODES)
 
     for match in matches:
@@ -290,14 +329,15 @@ def match_mode(mode: str, remove_spaces: bool = False, allow_extra: bool = False
 
     return Match(filtered_matches)
 
-def match_totem(totem: str, scope: Optional[Iterable[str]] = None) -> Match[LocalTotem]:
-    """ Match a partial totem into the internal totem key.
+
+def match_totem(totem: str, scope: Iterable[str] | None = None) -> Match[LocalTotem]:
+    """Match a partial totem into the internal totem key.
 
     :param totem: Partial totem to match on
     :param scope: Limit matched modes to these explicitly passed-in totems (iterable of internal totem names).
     :return: Match object with all matches (see src.match.match_all)
     """
-    mode = totem.lower()
+    totem.lower()
     totem_map = messages.get_totem_mapping(reverse=True)
     matches = match_all(totem, totem_map.keys())
 

@@ -1,26 +1,31 @@
 from __future__ import annotations
 
 import traceback
-from typing import Optional
+
 from src import config
 
 __all__ = ["History", "enable_history", "disable_history"]
 
 ENABLED_NAMES: set[str] = set()
 
+
 def enable_history(name: str) -> None:
     ENABLED_NAMES.add(name)
+
 
 def disable_history(name: str) -> None:
     ENABLED_NAMES.discard(name)
 
+
 ENABLED_NAMES.update(config.Main.get("debug.containers.names"))
-HISTORY_LIMIT = config.Main.get("debug.containers.limit") # type: int
+HISTORY_LIMIT = config.Main.get("debug.containers.limit")  # type: int
+
 
 class History:
     def __init__(self, name: str):
         self.name = name
-        self.history: list[tuple[str, list[str], dict[str,str], traceback.StackSummary]] = []
+        self.history: list[tuple[str, list[str], dict[str, str], traceback.StackSummary]] = []
+
     def __str__(self) -> str:
         return self.list(-5)
 
@@ -30,10 +35,10 @@ class History:
     def _format_item(self, item) -> str:
         arglist = list(item[1])
         for k, v in item[2].items():
-            arglist.append("{0}={1}".format(k, v))
-        return "{0}({1})".format(item[0], ", ".join(arglist))
+            arglist.append(f"{k}={v}")
+        return "{}({})".format(item[0], ", ".join(arglist))
 
-    def list(self, start: Optional[int] = None, stop: Optional[int] = None) -> str:
+    def list(self, start: int | None = None, stop: int | None = None) -> str:
         if not self.history:
             return "No history"
 
@@ -47,7 +52,7 @@ class History:
             start_index = start
 
         for i, item in enumerate(self.history[s], start=start_index):
-            lines.append("{0}: {1}".format(i, self._format_item(item)))
+            lines.append(f"{i}: {self._format_item(item)}")
         return "\n".join(lines)
 
     def get(self, index: int) -> str:

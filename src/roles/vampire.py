@@ -1,34 +1,38 @@
 from __future__ import annotations
 
 import re
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from src import config, gamestate, relay
-from src.dispatcher import MessageDispatcher
-from src.functions import get_players, get_all_players, get_main_role, get_target
-from src.decorators import command
-from src.containers import UserSet, UserDict
-from src.messages import messages
-from src.status import try_misdirection, try_exchange, add_protection, add_absent
-from src.events import Event, event_listener
-from src.users import User
 from src.cats import Vampire
+from src.containers import UserDict, UserSet
+from src.decorators import command
+from src.dispatcher import MessageDispatcher
+from src.events import Event, event_listener
+from src.functions import get_all_players, get_main_role, get_players, get_target
+from src.messages import messages
 from src.random import random
+from src.status import add_absent, add_protection, try_exchange, try_misdirection
+from src.users import User
 
 # some of this should be refactored into a helper class once we have more than one vampire role
 # for now keeping it all together makes for cleaner code though, as I'm not 100% sure which parts will
 # need to be shared and which parts will be unique to this particular vampire role; it'll depend on what
 # the new role is/does.
 
+
 class GameState(gamestate.GameState):
     def __init__(self):
         self.vampire_drained: UserSet = UserSet()
         self.vampire_acted: UserDict[User, User] = UserDict()
 
-@command("bite", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("vampire",))
+
+@command(
+    "bite", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("vampire",)
+)
 def vampire_bite(wrapper: MessageDispatcher, message: str):
     """Bite someone at night, draining their blood. Kills them if they were already drained."""
-    var = wrapper.game_state # type: GameState
+    var = wrapper.game_state  # type: GameState
     target = get_target(wrapper, re.split(" +", message)[0])
     if not target:
         return
@@ -53,11 +57,14 @@ def vampire_bite(wrapper: MessageDispatcher, message: str):
 
     var.vampire_acted[wrapper.source] = target
     wrapper.send(messages["vampire_bite"].format(orig))
-    send_vampire_chat_message(var,
-                              wrapper.source,
-                              messages["vampire_bite_vampchat"].format(wrapper.source, target),
-                              Vampire,
-                              cmd="bite")
+    send_vampire_chat_message(
+        var,
+        wrapper.source,
+        messages["vampire_bite_vampchat"].format(wrapper.source, target),
+        Vampire,
+        cmd="bite",
+    )
+
 
 @command("retract", chan=False, pm=True, playing=True, phases=("night",), roles=("vampire",))
 def vampire_retract(wrapper: MessageDispatcher, message: str):
@@ -66,18 +73,22 @@ def vampire_retract(wrapper: MessageDispatcher, message: str):
     if wrapper.source not in var.vampire_acted:
         return
 
-    del var.vampire_acted[:wrapper.source:]
+    del var.vampire_acted[: wrapper.source :]
     wrapper.send(messages["retracted_bite"])
-    send_vampire_chat_message(var,
-                              wrapper.source,
-                              messages["retracted_bite_vampchat"].format(wrapper.source),
-                              Vampire,
-                              cmd="retract")
+    send_vampire_chat_message(
+        var,
+        wrapper.source,
+        messages["retracted_bite_vampchat"].format(wrapper.source),
+        Vampire,
+        cmd="retract",
+    )
+
 
 @event_listener("chk_nightdone")
 def on_chk_nightdone(evt: Event, var: GameState):
     evt.data["acted"].extend(var.vampire_acted)
     evt.data["nightroles"].extend(get_all_players(var, ("vampire",)))
+
 
 @event_listener("send_role")
 def on_send_role(evt: Event, var: GameState):
@@ -107,11 +118,12 @@ def on_send_role(evt: Event, var: GameState):
         return
 
     for vampire in vampires:
-        vampire.queue_message(messages["wolfchat_notify_{0}".format(cond)].format("Vampire"))
+        vampire.queue_message(messages[f"wolfchat_notify_{cond}"].format("Vampire"))
     User.send_messages()
 
+
 @event_listener("new_role")
-def on_new_role(evt: Event, var: GameState, player: User, old_role: Optional[str]):
+def on_new_role(evt: Event, var: GameState, player: User, old_role: str | None):
     if old_role == "vampire":
         del var.vampire_acted[:player:]
     elif old_role is None:
@@ -136,7 +148,11 @@ def on_new_role(evt: Event, var: GameState, player: User, old_role: Optional[str
         # this way in a role swap we aren't working on an inaccurate view of who should have which role and potentially
         # leak information or give inaccurate information to the new vampire
         evt.data["messages"].append(
-            lambda: messages["players_list"].format(get_vampire_list(var, player, role=evt.data["role"])))
+            lambda: messages["players_list"].format(
+                get_vampire_list(var, player, role=evt.data["role"])
+            )
+        )
+
 
 @event_listener("night_kills")
 def on_night_kills(evt: Event, var: GameState):
@@ -150,32 +166,40 @@ def on_night_kills(evt: Event, var: GameState):
     # important, otherwise our del_player listener instructs vampire to choose again
     var.vampire_acted.clear()
 
+
 @event_listener("player_protected")
-def on_player_protected(evt: Event,
-                        var: GameState,
-                        target: User,
-                        attacker: Optional[User],
-                        attacker_role: str,
-                        protector: User,
-                        protector_role: str,
-                        reason: str):
+def on_player_protected(
+    evt: Event,
+    var: GameState,
+    target: User,
+    attacker: User | None,
+    attacker_role: str,
+    protector: User,
+    protector_role: str,
+    reason: str,
+):
     if protector_role == "vampire" and target not in var.vampire_drained:
         var.vampire_drained.add(target)
         target.send(messages["vampire_drained"])
         add_absent(var, target, "drained")
+
 
 @event_listener("add_lycanthropy")
 def on_add_lycanthropy(evt: Event, var: GameState, target):
     if target in get_all_players(var, ("vampire",)):
         evt.prevent_default = True
 
+
 @event_listener("add_disease")
 def on_add_disease(evt: Event, var: GameState, target):
     if target in get_all_players(var, ("vampire",)):
         evt.prevent_default = True
 
+
 @event_listener("del_player")
-def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool):
+def on_del_player(
+    evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool
+):
     if not var.in_game:
         return
 
@@ -186,26 +210,35 @@ def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str],
             vampire.send(messages["hunter_discard"])
             del var.vampire_acted[vampire]
 
+
 @event_listener("get_role_metadata")
-def on_get_role_metadata(evt: Event, var: Optional[GameState], kind: str):
+def on_get_role_metadata(evt: Event, var: GameState | None, kind: str):
     if kind == "night_kills":
         evt.data["vampire"] = min(len(var.vampire_drained), len(get_all_players(var, ("vampire",))))
     elif kind == "role_categories":
-        evt.data["vampire"] = {"Vampire", "Vampire Team", "Killer", "Nocturnal", "Vampire Objective", "Village Objective", "Evil"}
+        evt.data["vampire"] = {
+            "Vampire",
+            "Vampire Team",
+            "Killer",
+            "Nocturnal",
+            "Vampire Objective",
+            "Village Objective",
+            "Evil",
+        }
+
 
 _bite_cmds = ("bite", "retract")
+
 
 def is_known_vampire_ally(var, actor, target):
     actor_role = get_main_role(var, actor)
     target_role = get_main_role(var, target)
     return actor_role in Vampire and target_role in Vampire
 
-def send_vampire_chat_message(var: GameState,
-                              player: User,
-                              message: str,
-                              roles: Iterable[str],
-                              *,
-                              cmd: Optional[str] = None):
+
+def send_vampire_chat_message(
+    var: GameState, player: User, message: str, roles: Iterable[str], *, cmd: str | None = None
+):
     if cmd not in _bite_cmds and config.Main.get("gameplay.wolfchat.only_kill_command"):
         if var.current_phase == "night" and config.Main.get("gameplay.wolfchat.disable_night"):
             return
@@ -232,13 +265,11 @@ def send_vampire_chat_message(var: GameState,
     if player is not None:
         player.send_messages()
 
-def get_vampire_list(var,
-                     player: User,
-                     *,
-                     shuffle: bool = True,
-                     remove_player: bool = True,
-                     role: Optional[str] = None) -> list[str]:
-    """ Retrieve the list of players annotated for displaying to vampire team members.
+
+def get_vampire_list(
+    var, player: User, *, shuffle: bool = True, remove_player: bool = True, role: str | None = None
+) -> list[str]:
+    """Retrieve the list of players annotated for displaying to vampire team members.
 
     :param var: Game state
     :param player: Player the vampire list will be displayed to

@@ -2,25 +2,27 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Optional
 
-from src import users, channels
+from src import channels, users
 from src.cats import Category
-from src.containers import UserSet, UserDict
+from src.containers import UserDict, UserSet
 from src.decorators import command
 from src.dispatcher import MessageDispatcher
 from src.events import Event, event_listener
-from src.functions import get_players, get_all_players, get_target, get_reveal_role
+from src.functions import get_all_players, get_players, get_reveal_role, get_target
 from src.gamestate import GameState
 from src.messages import messages
-from src.status import try_misdirection, try_exchange, try_protection, add_dying, is_dead
-from src.users import User
 from src.random import random
+from src.status import add_dying, is_dead, try_exchange, try_misdirection, try_protection
+from src.users import User
 
 KILLS: UserDict[users.User, users.User] = UserDict()
 TARGETS: UserDict[users.User, UserSet] = UserDict()
 
-@command("kill", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("dullahan",))
+
+@command(
+    "kill", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("dullahan",)
+)
 def dullahan_kill(wrapper: MessageDispatcher, message: str):
     """Kill someone at night as a dullahan until everyone on your list is dead."""
     var = wrapper.game_state
@@ -44,6 +46,7 @@ def dullahan_kill(wrapper: MessageDispatcher, message: str):
     KILLS[wrapper.source] = target
     wrapper.pm(messages["player_kill"].format(orig))
 
+
 @command("retract", chan=False, pm=True, playing=True, phases=("night",), roles=("dullahan",))
 def dullahan_retract(wrapper: MessageDispatcher, message: str):
     """Removes a dullahan's kill selection."""
@@ -51,16 +54,29 @@ def dullahan_retract(wrapper: MessageDispatcher, message: str):
         del KILLS[wrapper.source]
         wrapper.pm(messages["retracted_kill"])
 
+
 @event_listener("player_win")
-def on_player_win(evt: Event, var: GameState, player: User, main_role: str, all_roles: set[str], winner: Category, team_win: bool, survived: bool):
+def on_player_win(
+    evt: Event,
+    var: GameState,
+    player: User,
+    main_role: str,
+    all_roles: set[str],
+    winner: Category,
+    team_win: bool,
+    survived: bool,
+):
     if main_role != "dullahan":
         return
     alive = set(get_players(var))
     if not TARGETS[player] & alive:
         evt.data["individual_win"] = True
 
+
 @event_listener("del_player")
-def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool):
+def on_del_player(
+    evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool
+):
     for h, v in list(KILLS.items()):
         if v is player:
             h.send(messages["hunter_discard"])
@@ -79,10 +95,15 @@ def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str],
 
                 if var.role_reveal in ("on", "team"):
                     role = get_reveal_role(var, target)
-                    channels.Main.send(messages["dullahan_die_success"].format(player, target, role))
+                    channels.Main.send(
+                        messages["dullahan_die_success"].format(player, target, role)
+                    )
                 else:
-                    channels.Main.send(messages["dullahan_die_success_noreveal"].format(player, target))
+                    channels.Main.send(
+                        messages["dullahan_die_success_noreveal"].format(player, target)
+                    )
                 add_dying(var, target, "dullahan", "dullahan_die", killer=player)
+
 
 @event_listener("night_kills")
 def on_night_kills(evt: Event, var: GameState):
@@ -91,10 +112,11 @@ def on_night_kills(evt: Event, var: GameState):
         evt.data["victims"].add(d)
         evt.data["killers"][d].append(k)
 
+
 @event_listener("new_role")
-def on_new_role(evt: Event, var: GameState, player: User, old_role: Optional[str]):
+def on_new_role(evt: Event, var: GameState, player: User, old_role: str | None):
     if player in TARGETS and old_role == "dullahan" and evt.data["role"] != "dullahan":
-        del KILLS[:player:] # type: ignore
+        del KILLS[:player:]  # type: ignore
         del TARGETS[player]
 
     if player not in TARGETS and evt.data["role"] == "dullahan":
@@ -102,7 +124,9 @@ def on_new_role(evt: Event, var: GameState, player: User, old_role: Optional[str
         max_targets = math.ceil(8.1 * math.log(len(pl), 10) - 5)
         TARGETS[player] = UserSet()
 
-        dull_targets = Event("dullahan_targets", {"targets": set(), "exclude": set(), "num_targets": max_targets})
+        dull_targets = Event(
+            "dullahan_targets", {"targets": set(), "exclude": set(), "num_targets": max_targets}
+        )
         dull_targets.dispatch(var, player, max_targets)
         TARGETS[player].update(dull_targets.data["targets"] - dull_targets.data["exclude"])
         max_targets = dull_targets.data["num_targets"]
@@ -112,6 +136,7 @@ def on_new_role(evt: Event, var: GameState, player: User, old_role: Optional[str
             target = random.choice(pl)
             pl.remove(target)
             TARGETS[player].add(target)
+
 
 @event_listener("swap_role_state")
 def on_swap_role_state(evt: Event, var: GameState, actor: User, target: User, role: str):
@@ -128,6 +153,7 @@ def on_swap_role_state(evt: Event, var: GameState, actor: User, target: User, ro
         TARGETS[actor] = targ_targets
         TARGETS[target] = act_targets
 
+
 @event_listener("chk_nightdone")
 def on_chk_nightdone(evt: Event, var: GameState):
     spl = set(get_players(var))
@@ -136,6 +162,7 @@ def on_chk_nightdone(evt: Event, var: GameState):
         if targets & spl and dullahan in spl:
             evt.data["nightroles"].append(dullahan)
 
+
 @event_listener("send_role")
 def on_transition_night_end(evt: Event, var: GameState):
     for dullahan in get_all_players(var, ("dullahan",)):
@@ -143,13 +170,18 @@ def on_transition_night_end(evt: Event, var: GameState):
         for target in targets[:]:
             if is_dead(var, target):
                 targets.remove(target)
-        if not targets: # already all dead
+        if not targets:  # already all dead
             continue
         random.shuffle(targets)
-        t = messages["dullahan_targets"] if targets == list(TARGETS[dullahan]) else messages["dullahan_remaining_targets"]
+        t = (
+            messages["dullahan_targets"]
+            if targets == list(TARGETS[dullahan])
+            else messages["dullahan_remaining_targets"]
+        )
         dullahan.send(messages["dullahan_notify"])
         if var.next_phase == "night":
             dullahan.send(t.format(targets))
+
 
 @event_listener("visit")
 def on_visit(evt: Event, var: GameState, visitor_role: str, visitor: User, visited: User):
@@ -158,6 +190,7 @@ def on_visit(evt: Event, var: GameState, visitor_role: str, visitor: User, visit
         if visited in TARGETS and TARGETS[visited].intersection(succubi):
             TARGETS[visited].difference_update(succubi)
             visited.send(messages["dullahan_no_kill_succubus"])
+
 
 @event_listener("myrole")
 def on_myrole(evt: Event, var: GameState, user):
@@ -169,10 +202,15 @@ def on_myrole(evt: Event, var: GameState, user):
                 targets.remove(target)
         random.shuffle(targets)
         if targets:
-            t = messages["dullahan_targets"] if set(targets) == TARGETS[user] else messages["dullahan_remaining_targets"]
+            t = (
+                messages["dullahan_targets"]
+                if set(targets) == TARGETS[user]
+                else messages["dullahan_remaining_targets"]
+            )
             evt.data["messages"].append(t.format(targets))
         else:
             evt.data["messages"].append(messages["dullahan_targets_dead"])
+
 
 @event_listener("revealroles_role")
 def on_revealroles_role(evt: Event, var: GameState, user: User, role: str):
@@ -186,17 +224,20 @@ def on_revealroles_role(evt: Event, var: GameState, user: User, role: str):
         else:
             evt.data["special_case"].append(messages["dullahan_all_dead"])
 
+
 @event_listener("begin_day")
 def on_begin_day(evt: Event, var: GameState):
     KILLS.clear()
+
 
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):
     KILLS.clear()
     TARGETS.clear()
 
+
 @event_listener("get_role_metadata")
-def on_get_role_metadata(evt: Event, var: Optional[GameState], kind: str):
+def on_get_role_metadata(evt: Event, var: GameState | None, kind: str):
     if kind == "night_kills":
         num = 0
         for dull in var.roles["dullahan"]:

@@ -1,31 +1,33 @@
 from __future__ import annotations
 
+import re
 import threading
 import time
-import re
+from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Optional, Callable
 
+from src import channels, config, context, db, locks, pregame, reaper, relay, users
+from src.channels import Channel
+from src.debug import handle_error
 from src.decorators import command
+from src.dispatcher import MessageDispatcher
+from src.events import Event, EventListener, event_listener
 from src.functions import get_players, get_reveal_role
-from src.gamestate import PregameState, GameState
-from src.warnings import expire_tempbans, decrement_stasis, add_warning
+from src.gamestate import GameState, PregameState
 from src.messages import messages
 from src.status import add_dying, kill_players
-from src.events import Event, EventListener, event_listener
-from src.debug import handle_error
-from src import db, users, channels, locks, pregame, config, context, reaper, relay
-from src.dispatcher import MessageDispatcher
-from src.channels import Channel
 from src.users import User
+from src.warnings import add_warning, decrement_stasis, expire_tempbans
 
 PINGED_ALREADY: set[str] = set()
 PINGING_PLAYERS: bool = False
+
 
 @command("join", pm=True, allow_alt=False)
 def join(wrapper: MessageDispatcher, message: str):
     """Either starts a new game of Werewolf or joins an existing game that has not started yet."""
     from src.wolfgame import vote_gamemode
+
     var = wrapper.game_state
 
     if var is None or not var.in_game:
@@ -35,17 +37,21 @@ def join(wrapper: MessageDispatcher, message: str):
         def _cb():
             if message:
                 vote_gamemode(wrapper, message.lower().split()[0], doreply=False)
+
         join_player(wrapper, callback=_cb)
 
-    else: # join deadchat
+    else:  # join deadchat
         if wrapper.private and wrapper.source is not wrapper.target:
             relay.join_deadchat(var, wrapper.source)
 
-def join_player(wrapper: MessageDispatcher,
-                who: Optional[User] = None,
-                forced: bool = False,
-                *,
-                callback: Optional[Callable] = None) -> None:
+
+def join_player(
+    wrapper: MessageDispatcher,
+    who: User | None = None,
+    forced: bool = False,
+    *,
+    callback: Callable | None = None,
+) -> None:
     """Join a player to the game.
 
     :param wrapper: Player being joined
@@ -67,10 +73,12 @@ def join_player(wrapper: MessageDispatcher,
         return
 
     if _join_player(wrapper, who, forced) and callback:
-        callback() # FIXME: join_player should be async and return bool; caller can await it for result
+        callback()  # FIXME: join_player should be async and return bool; caller can await it for result
 
-def _join_player(wrapper: MessageDispatcher, who: Optional[User] = None, forced=False):
+
+def _join_player(wrapper: MessageDispatcher, who: User | None = None, forced=False):
     from src import trans
+
     var = wrapper.game_state
     pl = get_players(var)
 
@@ -107,10 +115,12 @@ def _join_player(wrapper: MessageDispatcher, who: Optional[User] = None, forced=
         if wrapper.source.account:
             trans.ORIGINAL_ACCOUNTS[wrapper.source] = wrapper.source.account
         if config.Main.get("timers.wait.enabled"):
-            pregame.CAN_START_TIME = datetime.now() + timedelta(seconds=config.Main.get("timers.wait.initial"))
+            pregame.CAN_START_TIME = datetime.now() + timedelta(
+                seconds=config.Main.get("timers.wait.initial")
+            )
             with locks.wait:
                 pregame.WAIT_TOKENS = config.Main.get("timers.wait.command.tokenbucket.initial")
-                pregame.WAIT_LAST   = time.time()
+                pregame.WAIT_LAST = time.time()
         wrapper.send(messages["new_game"].format(wrapper.source))
 
         # Set join timer
@@ -123,7 +133,9 @@ def _join_player(wrapper: MessageDispatcher, who: Optional[User] = None, forced=
     elif wrapper.source in pl:
         key = "you_already_playing" if who is wrapper.source else "other_already_playing"
         who.send(messages[key], notice=True)
-        return True # returning True lets them use !j mode to vote for a gamemode while already joined
+        return (
+            True  # returning True lets them use !j mode to vote for a gamemode while already joined
+        )
     elif len(pl) >= config.Main.get("gameplay.player_limits.maximum"):
         who.send(messages["too_many_players"], notice=True)
         return False
@@ -135,7 +147,9 @@ def _join_player(wrapper: MessageDispatcher, who: Optional[User] = None, forced=
             for player in pl:
                 if context.equals(player.account, temp.account):
                     if who is wrapper.source:
-                        who.send(messages["account_already_joined_self"].format(player), notice=True)
+                        who.send(
+                            messages["account_already_joined_self"].format(player), notice=True
+                        )
                     else:
                         who.send(messages["account_already_joined_other"].format(who), notice=True)
                     return
@@ -150,15 +164,23 @@ def _join_player(wrapper: MessageDispatcher, who: Optional[User] = None, forced=
 
         # ORIGINAL_ACCOUNTS is only cleared on reset(), so can be used to determine if a player has previously joined
         # The logic in this if statement should only run once per account
-        if not wrapper.source.is_fake and wrapper.source.account not in trans.ORIGINAL_ACCOUNTS.values():
+        if (
+            not wrapper.source.is_fake
+            and wrapper.source.account not in trans.ORIGINAL_ACCOUNTS.values()
+        ):
             if wrapper.source.account:
                 trans.ORIGINAL_ACCOUNTS[wrapper.source] = wrapper.source.account
             now = datetime.now()
 
             if config.Main.get("timers.wait.enabled"):
                 # make sure there's at least wait.join seconds of wait time left, if not add them
-                if now + timedelta(seconds=config.Main.get("timers.wait.join")) > pregame.CAN_START_TIME:
-                    pregame.CAN_START_TIME = now + timedelta(seconds=config.Main.get("timers.wait.join"))
+                if (
+                    now + timedelta(seconds=config.Main.get("timers.wait.join"))
+                    > pregame.CAN_START_TIME
+                ):
+                    pregame.CAN_START_TIME = now + timedelta(
+                        seconds=config.Main.get("timers.wait.join")
+                    )
 
     with locks.join_timer:
         if "join_pinger" in trans.TIMERS:
@@ -174,9 +196,11 @@ def _join_player(wrapper: MessageDispatcher, who: Optional[User] = None, forced=
 
     return True
 
+
 @handle_error
 def kill_join(var: GameState, wrapper: MessageDispatcher):
     from src import trans
+
     pl = [x.nick for x in get_players(var)]
     pl.sort(key=lambda x: x.lower())
     trans.reset(var)
@@ -189,6 +213,7 @@ def kill_join(var: GameState, wrapper: MessageDispatcher):
     if trans.ENDGAME_COMMAND is not None:
         trans.ENDGAME_COMMAND()
         trans.ENDGAME_COMMAND = None
+
 
 @command("fjoin", flag="A")
 def fjoin(wrapper: MessageDispatcher, message: str):
@@ -234,15 +259,22 @@ def fjoin(wrapper: MessageDispatcher, message: str):
         elif "-" in tojoin and debug_mode:
             first, hyphen, last = tojoin.partition("-")
             if first.isdigit() and last.isdigit():
-                if int(last)+1 - int(first) > config.Main.get("gameplay.player_limits.maximum") - len(get_players(wrapper.game_state)):
+                if int(last) + 1 - int(first) > config.Main.get(
+                    "gameplay.player_limits.maximum"
+                ) - len(get_players(wrapper.game_state)):
                     wrapper.send(messages["too_many_players_to_join"].format(wrapper.source))
                     break
                 success = True
-                for i in range(int(first), int(last)+1):
+                for i in range(int(first), int(last) + 1):
                     user = users.add(wrapper.client, nick=str(i))
-                    join_player(type(wrapper)(user, wrapper.target), forced=True, who=wrapper.source)
+                    join_player(
+                        type(wrapper)(user, wrapper.target), forced=True, who=wrapper.source
+                    )
     if success:
-        wrapper.send(messages["fjoin_success"].format(wrapper.source, len(get_players(wrapper.game_state))))
+        wrapper.send(
+            messages["fjoin_success"].format(wrapper.source, len(get_players(wrapper.game_state)))
+        )
+
 
 @command("pingif", pm=True)
 def altpinger(wrapper: MessageDispatcher, message: str):
@@ -263,10 +295,13 @@ def altpinger(wrapper: MessageDispatcher, message: str):
         else:
             msg.append(messages["no_pingif"])
 
-    elif any((args[0] in ("off", "never"),
-              args[0].isdigit() and int(args[0]) == 0,
-              len(args) > 1 and args[1].isdigit() and int(args[1]) == 0)):
-
+    elif any(
+        (
+            args[0] in ("off", "never"),
+            args[0].isdigit() and int(args[0]) == 0,
+            len(args) > 1 and args[1].isdigit() and int(args[1]) == 0,
+        )
+    ):
         if players:
             msg.append(messages["unset_pingif"].format(players))
             wrapper.source.set_pingif_count(0, players)
@@ -293,6 +328,7 @@ def altpinger(wrapper: MessageDispatcher, message: str):
         msg.append(messages["pingif_invalid"])
 
     wrapper.pm(*msg, sep="\n")
+
 
 @handle_error
 def join_timer_handler(var):
@@ -325,8 +361,14 @@ def join_timer_handler(var):
             return
 
         def get_altpingers(event: Event, chan: Channel, user: User):
-            if (event.params.away or user.stasis_count() or not PINGING_PLAYERS or
-                    chan is not channels.Main or user is users.Bot or user in pl):
+            if (
+                event.params.away
+                or user.stasis_count()
+                or not PINGING_PLAYERS
+                or chan is not channels.Main
+                or user is users.Bot
+                or user in pl
+            ):
                 return
 
             temp = user.lower()
@@ -357,6 +399,7 @@ def join_timer_handler(var):
 
         channels.Main.who()
 
+
 @command("leave", pm=True)
 def leave_game(wrapper: MessageDispatcher, message: str):
     """Quits the game."""
@@ -380,7 +423,11 @@ def leave_game(wrapper: MessageDispatcher, message: str):
                 return
             population = ""
     elif wrapper.private:
-        if var.in_game and wrapper.source not in get_players(var) and wrapper.source in relay.DEADCHAT_PLAYERS:
+        if (
+            var.in_game
+            and wrapper.source not in get_players(var)
+            and wrapper.source in relay.DEADCHAT_PLAYERS
+        ):
             relay.leave_deadchat(var, wrapper.source)
         return
     else:
@@ -393,16 +440,30 @@ def leave_game(wrapper: MessageDispatcher, message: str):
         channels.Main.send(messages["quit_no_reveal"].format(wrapper.source) + population)
     if var.current_phase != "join":
         reaper.DCED_LOSERS.add(wrapper.source)
-        if config.Main.get("reaper.enabled") and config.Main.get("reaper.leave.enabled") and config.Main.get("reaper.autowarn"):
-            reaper.NIGHT_IDLED.discard(wrapper.source) # don't double-dip if they idled out night as well
-            add_warning(wrapper.source, config.Main.get("reaper.leave.points"), users.Bot, messages["leave_warning"], expires=config.Main.get("reaper.leave.expiration"))
+        if (
+            config.Main.get("reaper.enabled")
+            and config.Main.get("reaper.leave.enabled")
+            and config.Main.get("reaper.autowarn")
+        ):
+            reaper.NIGHT_IDLED.discard(
+                wrapper.source
+            )  # don't double-dip if they idled out night as well
+            add_warning(
+                wrapper.source,
+                config.Main.get("reaper.leave.points"),
+                users.Bot,
+                messages["leave_warning"],
+                expires=config.Main.get("reaper.leave.expiration"),
+            )
 
     add_dying(var, wrapper.source, "bot", "quit", death_triggers=False)
     kill_players(var)
     if not var.in_game and len(get_players(var)) == 0:
         # chk_win handles ending game at 0 players if a game is running, don't need to do so here
         from src.trans import stop_game
+
         stop_game(var, log=False)
+
 
 @command("fleave", flag="A", pm=True)
 def fleave(wrapper: MessageDispatcher, message: str):
@@ -447,6 +508,7 @@ def fleave(wrapper: MessageDispatcher, message: str):
             if not var.in_game and len(get_players(var)) == 0:
                 # chk_win handles ending game at 0 players if a game is running, don't need to do so here
                 from src.trans import stop_game
+
                 stop_game(var, log=False)
 
         elif dead_target:
@@ -458,6 +520,7 @@ def fleave(wrapper: MessageDispatcher, message: str):
         else:
             wrapper.send(messages["not_playing"].format(person))
             return
+
 
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):

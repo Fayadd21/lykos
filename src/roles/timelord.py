@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Optional
 
 from src import channels
-from src.events import event_listener, Event
+from src.events import Event, event_listener
 from src.gamestate import GameState
 from src.messages import messages
 from src.users import User
@@ -26,8 +25,11 @@ TIME_ATTRIBUTES = (
 
 TRIGGERED = False
 
+
 @event_listener("del_player")
-def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool):
+def on_del_player(
+    evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool
+):
     global TRIGGERED
     if not death_triggers or "time lord" not in all_roles:
         return
@@ -36,9 +38,12 @@ def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str],
 
     TRIGGERED = True
     values = dict(TIME_ATTRIBUTES)
-    channels.Main.send(messages["time_lord_dead"].format(values["day_time_limit"], values["night_time_limit"]))
+    channels.Main.send(
+        messages["time_lord_dead"].format(values["day_time_limit"], values["night_time_limit"])
+    )
 
-    from src.trans import hurry_up, night_timeout, DAY_ID, NIGHT_ID, TIMERS
+    from src.trans import DAY_ID, NIGHT_ID, TIMERS, hurry_up, night_timeout
+
     if var.current_phase == "day":
         time_limit = var.day_time_limit
         cb = hurry_up
@@ -57,7 +62,10 @@ def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str],
         return
 
     if f"{var.current_phase}_limit" in TIMERS:
-        time_left = int((TIMERS[f"{var.current_phase}_limit"][1] + TIMERS[f"{var.current_phase}_limit"][2]) - time.time())
+        time_left = int(
+            (TIMERS[f"{var.current_phase}_limit"][1] + TIMERS[f"{var.current_phase}_limit"][2])
+            - time.time()
+        )
 
         if time_left > time_limit > 0:
             t = threading.Timer(time_limit, cb, limit_args)
@@ -75,18 +83,21 @@ def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str],
                     t.daemon = True
                     t.start()
 
+
 @event_listener("night_idled")
 def on_night_idled(evt: Event, var: GameState, player: User):
     # don't give people warning points on night idle when time lord is active
     if TRIGGERED:
         evt.prevent_default = True
 
+
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):
     global TRIGGERED
     TRIGGERED = False
 
+
 @event_listener("get_role_metadata")
-def on_get_role_metadata(evt: Event, var: Optional[GameState], kind: str):
+def on_get_role_metadata(evt: Event, var: GameState | None, kind: str):
     if kind == "role_categories":
         evt.data["time lord"] = {"Hidden"}

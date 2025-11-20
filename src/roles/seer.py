@@ -1,22 +1,23 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
 
-from src.cats import Cursed, Safe, Innocent, Neutral, Win_Stealer, Team_Switcher, Wolf
+from src.cats import Cursed, Innocent, Neutral, Safe, Team_Switcher, Win_Stealer, Wolf
 from src.decorators import command
+from src.dispatcher import MessageDispatcher
 from src.events import Event, event_listener
 from src.functions import get_main_role, get_target
+from src.gamestate import GameState
 from src.messages import messages
 from src.roles.helper.seers import setup_variables
-from src.status import try_misdirection, try_exchange
-from src.dispatcher import MessageDispatcher
-from src.gamestate import GameState
-
+from src.status import try_exchange, try_misdirection
 
 SEEN = setup_variables("seer")
 
-@command("see", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("seer",))
+
+@command(
+    "see", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("seer",)
+)
 def see(wrapper: MessageDispatcher, message: str):
     """Use your paranormal powers to determine the role or alignment of a player."""
     if wrapper.source in SEEN:
@@ -38,11 +39,11 @@ def see(wrapper: MessageDispatcher, message: str):
     if targrole in Cursed:
         targrole = "wolf"
     elif targrole in Safe:
-        pass # Keep the same role
+        pass  # Keep the same role
     elif targrole in Innocent:
         targrole = var.hidden_role
     elif targrole in (Neutral - Win_Stealer - Team_Switcher):
-        pass # Keep the same role
+        pass  # Keep the same role
     elif targrole in Wolf:
         targrole = "wolf"
     else:
@@ -56,8 +57,9 @@ def see(wrapper: MessageDispatcher, message: str):
 
     SEEN.add(wrapper.source)
 
+
 @event_listener("get_role_metadata")
-def on_get_role_metadata(evt: Event, var: Optional[GameState], kind: str):
+def on_get_role_metadata(evt: Event, var: GameState | None, kind: str):
     if kind == "role_categories":
         evt.data["seer"] = {"Village", "Nocturnal", "Spy", "Safe"}
     elif kind == "lycanthropy_role":

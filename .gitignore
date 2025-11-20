@@ -8,9 +8,12 @@
 __pycache__/
 dist/
 *.py[co]
+*.egg-info/
 
-# Linter files
+# Linter and code quality tools
 .mypy_cache/
+.ruff_cache/
+.pytest_cache/
 
 # Config files
 botconfig.*
@@ -40,3 +43,17 @@ botconfig.*
 .antlr/
 .vs/
 venv/
+.venv/
+
+# Testing and coverage
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Pre-commit
+.pre-commit/
+
+# Sphinx documentation build outputs
+docs/build/

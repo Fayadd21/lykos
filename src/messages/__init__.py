@@ -1,19 +1,21 @@
 from __future__ import annotations
-from typing import Optional, Any
+
 from abc import ABC, abstractmethod
+from typing import Any, Optional
 
 # Setup: the formatter needs to be ready when we import the messages
 from src.messages.formatter import Formatter
+
 message_formatter = Formatter()
 
 from src.messages import _messages
 from src.messages.message import Message
 
-__all__ = ["messages", "message_formatter", "internal_en",
-           "LocalRole", "LocalMode", "LocalTotem"]
+__all__ = ["messages", "message_formatter", "internal_en", "LocalRole", "LocalMode", "LocalTotem"]
 
 messages = _messages.Messages()
 internal_en = _messages.Messages(override="en")
+
 
 class LocalKeyValueWrapper(ABC):
     def __init__(self, key: str, custom: Any):
@@ -24,7 +26,11 @@ class LocalKeyValueWrapper(ABC):
         return hash((self._key, self._custom))
 
     def __eq__(self, other):
-        return isinstance(other, self.__class__) and self._key == other._key and self._custom == other._custom
+        return (
+            isinstance(other, self.__class__)
+            and self._key == other._key
+            and self._custom == other._custom
+        )
 
     def __str__(self):
         return self.local
@@ -38,8 +44,9 @@ class LocalKeyValueWrapper(ABC):
     def local(self) -> str:
         pass
 
+
 class LocalRole(LocalKeyValueWrapper):
-    def __init__(self, key: str, singular: Optional[str] = None, plural: Optional[str] = None):
+    def __init__(self, key: str, singular: str | None = None, plural: str | None = None):
         super().__init__(key, (singular, plural))
         self._singular = singular
         self._plural = plural
@@ -49,7 +56,7 @@ class LocalRole(LocalKeyValueWrapper):
 
     @classmethod
     def from_en(cls, role: str) -> LocalRole:
-        """ Return the role given a version of the internal (English) role name
+        """Return the role given a version of the internal (English) role name
 
         :param role: An English version of the role (which may be singular or plural)
         :return: LocalRole instance for the current language
@@ -59,7 +66,7 @@ class LocalRole(LocalKeyValueWrapper):
             if role in vals:
                 return LocalRole(key)
 
-        raise ValueError("No role named {0} exists".format(role))
+        raise ValueError(f"No role named {role} exists")
 
     @property
     def local(self) -> str:
@@ -77,8 +84,9 @@ class LocalRole(LocalKeyValueWrapper):
             self._plural = self._resolve(number=2)
         return self._plural
 
+
 class LocalMode(LocalKeyValueWrapper):
-    def __init__(self, key: str, local: Optional[str] = None):
+    def __init__(self, key: str, local: str | None = None):
         super().__init__(key, local)
         self._local = local
 
@@ -88,8 +96,9 @@ class LocalMode(LocalKeyValueWrapper):
             self._local = Message("*", "{0!mode}").format(self.key)
         return self._local
 
+
 class LocalTotem(LocalKeyValueWrapper):
-    def __init__(self, key: str, local: Optional[str] = None):
+    def __init__(self, key: str, local: str | None = None):
         super().__init__(key, local)
         self._local = local
 

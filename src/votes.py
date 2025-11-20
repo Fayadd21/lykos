@@ -1,21 +1,30 @@
 from __future__ import annotations
 
-from collections import Counter
-from datetime import datetime, timedelta
 import math
 import re
+from collections import Counter
+from datetime import datetime, timedelta
 
+from src import channels, config, locks, pregame, reaper
 from src.containers import UserDict, UserList, UserSet
 from src.decorators import command
-from src.functions import get_players, get_target, get_reveal_role
-from src.messages import messages
-from src.status import (try_absent, get_absent, get_forced_votes, get_all_forced_votes, get_forced_abstains,
-                        get_vote_weight, try_day_vote_immunity, add_dying, kill_players)
-from src.events import Event, event_listener
-from src import channels, pregame, reaper, locks, config
-from src.users import User
 from src.dispatcher import MessageDispatcher
+from src.events import Event, event_listener
+from src.functions import get_players, get_reveal_role, get_target
 from src.gamestate import GameState
+from src.messages import messages
+from src.status import (
+    add_dying,
+    get_absent,
+    get_all_forced_votes,
+    get_forced_abstains,
+    get_forced_votes,
+    get_vote_weight,
+    kill_players,
+    try_absent,
+    try_day_vote_immunity,
+)
+from src.users import User
 
 VOTES: UserDict[User, UserList] = UserDict()
 GAMEMODE_VOTES: UserDict[User, str] = UserDict()
@@ -23,6 +32,7 @@ ABSTAINS: UserSet = UserSet()
 ABSTAINED = False
 LAST_VOTES = None
 VOTED: int = 0
+
 
 @command("vote", playing=True, pm=True, phases=("day",))
 def day_vote(wrapper: MessageDispatcher, message: str):
@@ -38,7 +48,13 @@ def day_vote(wrapper: MessageDispatcher, message: str):
 
     can_vote_bot = var.current_mode.can_vote_bot(var)
 
-    voted = get_target(wrapper, msg, allow_self=var.self_vote_allowed, allow_bot=can_vote_bot, not_self_message="no_vote_self")
+    voted = get_target(
+        wrapper,
+        msg,
+        allow_self=var.self_vote_allowed,
+        allow_bot=can_vote_bot,
+        not_self_message="no_vote_self",
+    )
     if not voted:
         return
 
@@ -63,9 +79,10 @@ def day_vote(wrapper: MessageDispatcher, message: str):
         channels.Main.send(messages["player_vote"].format(wrapper.source, voted))
 
     global LAST_VOTES
-    LAST_VOTES = None # reset
+    LAST_VOTES = None  # reset
 
     chk_decision(var)
+
 
 @command("abstain", playing=True, phases=("day",))
 def abstain(wrapper: MessageDispatcher, message: str):
@@ -92,11 +109,16 @@ def abstain(wrapper: MessageDispatcher, message: str):
 
     chk_decision(var)
 
+
 @command("retract", phases=("day", "join"))
 def retract(wrapper: MessageDispatcher, message: str):
     """Takes back your vote during the day."""
     var = wrapper.game_state
-    if wrapper.source not in get_players(var) or wrapper.source in reaper.DISCONNECTED or var.current_phase != "day":
+    if (
+        wrapper.source not in get_players(var)
+        or wrapper.source in reaper.DISCONNECTED
+        or var.current_phase != "day"
+    ):
         return
 
     global LAST_VOTES
@@ -104,7 +126,7 @@ def retract(wrapper: MessageDispatcher, message: str):
     if wrapper.source in ABSTAINS:
         ABSTAINS.remove(wrapper.source)
         wrapper.send(messages["retracted_vote"].format(wrapper.source))
-        LAST_VOTES = None # reset
+        LAST_VOTES = None  # reset
         return
 
     for votee in list(VOTES):
@@ -113,10 +135,11 @@ def retract(wrapper: MessageDispatcher, message: str):
             if not VOTES[votee]:
                 del VOTES[votee]
             wrapper.send(messages["retracted_vote"].format(wrapper.source))
-            LAST_VOTES = None # reset
+            LAST_VOTES = None  # reset
             break
     else:
         wrapper.pm(messages["pending_vote"])
+
 
 @command("votes", pm=True, phases=("join", "day"))
 def show_votes(wrapper: MessageDispatcher, message: str):
@@ -126,28 +149,36 @@ def show_votes(wrapper: MessageDispatcher, message: str):
     if var.current_phase == "join":
         # get gamemode votes in a dict of {mode: number of votes}
         gm_votes = list(Counter(GAMEMODE_VOTES.values()).items())
-        gm_votes.sort(key=lambda x: x[1], reverse=True) # sort from highest to lowest
+        gm_votes.sort(key=lambda x: x[1], reverse=True)  # sort from highest to lowest
 
         votelist = []
         majority = False
         from src.gamemodes import GAME_MODES
+
         for gamemode, num_votes in gm_votes:
             # We bold the game mode if:
             # - The number of players is within the bounds of the game mode
             # - This game mode has a majority of votes
             # - It can be randomly picked
             # - No other game mode has a majority
-            if (GAME_MODES[gamemode][1] <= len(pl) <= GAME_MODES[gamemode][2] and
-                    (not majority or num_votes >= len(pl) / 2) and
-                    (config.Main.get(f"gameplay.modes.{gamemode}.weight", 0) > 0 or num_votes >= len(pl) / 2)):
+            if (
+                GAME_MODES[gamemode][1] <= len(pl) <= GAME_MODES[gamemode][2]
+                and (not majority or num_votes >= len(pl) / 2)
+                and (
+                    config.Main.get(f"gameplay.modes.{gamemode}.weight", 0) > 0
+                    or num_votes >= len(pl) / 2
+                )
+            ):
                 gamemode = messages["bold"].format(gamemode)
                 if num_votes >= len(pl) / 2:
                     majority = True
-            votelist.append("{0}: {1}".format(gamemode, num_votes))
+            votelist.append(f"{gamemode}: {num_votes}")
 
         msg = ", ".join(votelist)
         if len(pl) >= config.Main.get("gameplay.player_limits.minimum"):
-            msg += messages["majority_votes"].format("; " if votelist else "", math.ceil(len(pl) / 2))
+            msg += messages["majority_votes"].format(
+                "; " if votelist else "", math.ceil(len(pl) / 2)
+            )
 
         with locks.join_timer:
             if pregame.START_VOTES:
@@ -168,12 +199,14 @@ def show_votes(wrapper: MessageDispatcher, message: str):
     if not VOTES:
         msg = messages["no_votes"]
         if wrapper.source in pl:
-            LAST_VOTES = None # reset
+            LAST_VOTES = None  # reset
 
     else:
         votelist = []
         for votee, voters in VOTES.items():
-            votelist.append("{0}: {1} ({2})".format(votee, len(voters), ", ".join(p.nick for p in voters)))
+            votelist.append(
+                "{}: {} ({})".format(votee, len(voters), ", ".join(p.nick for p in voters))
+            )
         msg = ", ".join(votelist)
 
     wrapper.reply(msg, prefix_nick=True)
@@ -181,7 +214,7 @@ def show_votes(wrapper: MessageDispatcher, message: str):
     avail = len(pl) - len(get_absent(var))
     votesneeded = avail // 2 + 1
     abstaining = len(ABSTAINS)
-    if abstaining == 1: # *i18n* hardcoded English
+    if abstaining == 1:  # *i18n* hardcoded English
         plural = " has"
     else:
         plural = "s have"
@@ -192,18 +225,22 @@ def show_votes(wrapper: MessageDispatcher, message: str):
 
     wrapper.reply(to_send, prefix_nick=True)
 
+
 @command("vote", pm=True, phases=("join",))
 def vote(wrapper: MessageDispatcher, message: str):
     """Vote for a game mode if no game is running."""
     if wrapper.public and message:
         from src.wolfgame import game
+
         return game.caller(wrapper, message)
     return show_votes.caller(wrapper, message)
+
 
 # Specify timeout=True to force a vote and end of day even if there is no majority
 # admin_forced=True will make it not count towards villages' abstain limit if nobody is voted
 def chk_decision(var: GameState, *, timeout=False, admin_forced=False):
     from src.trans import chk_win
+
     with locks.reaper:
         players = set(get_players(var)) - get_absent(var)
         avail = len(players)
@@ -226,7 +263,12 @@ def chk_decision(var: GameState, *, timeout=False, admin_forced=False):
             assert len(plurality) == 1
             to_vote = plurality
 
-        behaviour_evt = Event("day_vote_behaviour", {"num_votes": 1, "kill_ties": False, "force": timeout}, votes=VOTES, players=avail)
+        behaviour_evt = Event(
+            "day_vote_behaviour",
+            {"num_votes": 1, "kill_ties": False, "force": timeout},
+            votes=VOTES,
+            players=avail,
+        )
         behaviour_evt.dispatch(var)
 
         num_votes = behaviour_evt.data["num_votes"]
@@ -241,7 +283,9 @@ def chk_decision(var: GameState, *, timeout=False, admin_forced=False):
                 if len(plurality) == 1:
                     to_vote = plurality
                 elif plurality and kill_ties:
-                    if set(plurality) == set(get_players(var)): # killing everyone off? have you considered not doing that
+                    if set(plurality) == set(
+                        get_players(var)
+                    ):  # killing everyone off? have you considered not doing that
                         abstaining = True
                     else:
                         to_vote.extend(plurality)
@@ -251,11 +295,13 @@ def chk_decision(var: GameState, *, timeout=False, admin_forced=False):
 
         if abstaining:
             for forced_abstainer in get_forced_abstains(var):
-                if forced_abstainer not in ABSTAINS: # did not explicitly abstain
+                if forced_abstainer not in ABSTAINS:  # did not explicitly abstain
                     channels.Main.send(messages["player_meek_abstain"].format(forced_abstainer))
 
             abstain_evt = Event("abstain", {})
-            abstain_evt.dispatch(var, (ABSTAINS | get_forced_abstains(var)) - get_all_forced_votes(var))
+            abstain_evt.dispatch(
+                var, (ABSTAINS | get_forced_abstains(var)) - get_all_forced_votes(var)
+            )
 
             if not admin_forced:
                 # if this is an admin-forced abstain that isn't also a timeout (currently doesn't exist in the bot),
@@ -265,12 +311,13 @@ def chk_decision(var: GameState, *, timeout=False, admin_forced=False):
             channels.Main.send(messages["village_abstain"])
 
             from src.trans import transition_night
+
             transition_night(var)
             return
 
         if to_vote:
             global VOTED
-            VOTED += len(to_vote) # track how many people we've killed today
+            VOTED += len(to_vote)  # track how many people we've killed today
 
             if timeout:
                 channels.Main.send(messages["sunset_vote"])
@@ -278,9 +325,11 @@ def chk_decision(var: GameState, *, timeout=False, admin_forced=False):
             for votee in to_vote:
                 voters = list(VOTES[votee])
                 for forced_voter in get_forced_votes(var, votee):
-                    if forced_voter not in voters: # did not explicitly vote
+                    if forced_voter not in voters:  # did not explicitly vote
                         channels.Main.send(messages["impatient_vote"].format(forced_voter, votee))
-                        voters.append(forced_voter) # they need to be counted as voting for them still
+                        voters.append(
+                            forced_voter
+                        )  # they need to be counted as voting for them still
 
                 if not try_day_vote_immunity(var, votee):
                     vote_evt = Event("day_vote", {}, players=avail)
@@ -302,24 +351,29 @@ def chk_decision(var: GameState, *, timeout=False, admin_forced=False):
                 return
 
             from src.trans import transition_night
+
             transition_night(var)
 
+
 @event_listener("del_player")
-def on_del_player(evt: Event, var: GameState, player: User, allroles: set[str], death_triggers: bool):
+def on_del_player(
+    evt: Event, var: GameState, player: User, allroles: set[str], death_triggers: bool
+):
     if var.current_phase == "day":
         if player in VOTES:
-            del VOTES[player] # Delete other people's votes on the player
+            del VOTES[player]  # Delete other people's votes on the player
         for k in list(VOTES):
             if player in VOTES[k]:
                 VOTES[k].remove(player)
                 if not VOTES[k]:  # no more votes on that person
                     del VOTES[k]
-                break # can only vote once
+                break  # can only vote once
 
         if player in ABSTAINS:
             ABSTAINS.remove(player)
     elif var.current_phase == "join":
         del GAMEMODE_VOTES[:player:]
+
 
 @event_listener("transition_day_begin")
 def on_transition_day_begin(evt: Event, var: GameState):
@@ -328,6 +382,7 @@ def on_transition_day_begin(evt: Event, var: GameState):
     VOTED = 0
     ABSTAINS.clear()
     VOTES.clear()
+
 
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):

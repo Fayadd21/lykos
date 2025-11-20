@@ -4,6 +4,7 @@ from src import config
 
 __all__ = ["get_ircd", "get_services"]
 
+
 def get_ircd() -> IRCD_Base:
     module = config.Main.get("transports[0].module")
     if module == "hybrid":
@@ -18,6 +19,7 @@ def get_ircd() -> IRCD_Base:
         return IRCD_Unreal()
     else:
         raise config.InvalidConfigValue(f"unknown IRCd value {module}")
+
 
 def get_services() -> Services_Base:
     module = config.Main.get("transports[0].authentication.services.module")
@@ -34,6 +36,7 @@ def get_services() -> Services_Base:
     else:
         raise config.InvalidConfigValue(f"unknown services value {module}")
 
+
 class IRCD_Base:
     name = ""
     quiet_mode = ""
@@ -43,16 +46,20 @@ class IRCD_Base:
     def supports_quiet(self):
         return False
 
+
 class IRCD_Hybrid(IRCD_Base):
     name = "hybrid"
     account_prefix = "$a:"
+
 
 class IRCD_Inspire(IRCD_Base):
     name = "inspircd"
     account_prefix = "R:"
 
+
 class IRCD_Generic(IRCD_Base):
     name = "generic"
+
 
 class IRCD_Solanum(IRCD_Base):
     name = "solanum"
@@ -62,11 +69,14 @@ class IRCD_Solanum(IRCD_Base):
     def supports_quiet(self):
         return True
 
+
 class IRCD_Unreal(IRCD_Base):
     name = "unrealircd"
     account_prefix = "~a:"
 
+
 # Services
+
 
 class Services_Base:
     name = ""
@@ -93,6 +103,7 @@ class Services_Base:
     def supports_account_change(self):
         return True
 
+
 class Services_Anope(Services_Base):
     name = "anope"
     nickserv = "NickServ"
@@ -100,6 +111,7 @@ class Services_Anope(Services_Base):
     regain = "RECOVER {nick} {password}"
     release = "RELEASE {nick} {password}"
     ghost = "GHOST {nick} {password}"
+
 
 class Services_Atheme(Services_Base):
     name = "atheme"
@@ -109,14 +121,17 @@ class Services_Atheme(Services_Base):
     release = "RELEASE {nick} {password}"
     ghost = "GHOST {nick} {password}"
 
+
 class Services_Generic(Services_Base):
     name = "generic"
     nickserv = "NickServ"
     command = "IDENTIFY {account} {password}"
     ghost = "GHOST {nick} {password}"
 
+
 class Services_None(Services_Base):
     name = "none"
+
 
 class Services_Undernet(Services_Base):
     # undernet does not support GHOST, because it sucks. why are you even on undernet

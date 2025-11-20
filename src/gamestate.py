@@ -3,23 +3,38 @@ from __future__ import annotations
 import copy
 import math
 import threading
-from typing import Any, Optional, Callable, ClassVar, TYPE_CHECKING
 import time
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, ClassVar
 
-from src.containers import UserSet, UserDict, UserList
-from src.messages import messages
+from src import channels, config, random
 from src.cats import All
-from src import config
+from src.containers import UserDict, UserList, UserSet
+from src.messages import messages
 from src.users import User
-from src import channels, random
 
 if TYPE_CHECKING:
     from src.gamemodes import GameMode
 
 __all__ = ["GameState", "PregameState", "set_gamemode"]
 
+
 def set_gamemode(var: PregameState, arg: str) -> bool:
+    """Picks which game mode to use.
+
+    Takes a string like "classic" or "random=5" and sets up
+    that game mode. Returns True if it worked, False if the
+    mode name was wrong or something broke.
+
+    Args:
+        var: The pregame state to set the mode on
+        arg: The mode name, maybe with extra options
+
+    Returns:
+        True if it worked, False otherwise
+    """
     from src.gamemodes import GAME_MODES, InvalidModeException
+
     modeargs = arg.split("=", 1)
 
     modeargs = [a.strip() for a in modeargs]
@@ -37,14 +52,22 @@ def set_gamemode(var: PregameState, arg: str) -> bool:
     channels.Main.send(messages["game_mode_not_found"].format(modeargs[0]))
     return False
 
+
 class PregameState:
+    """Keeps track of stuff before the game actually starts.
+
+    This is for when people are joining and picking the game mode.
+    It remembers who joined, what phase we're in (join or ready),
+    and which game mode was picked.
+    """
+
     def __init__(self):
         self.players = UserList()
         self.current_phase: str = "join"
         self.game_id: float = time.time()
-        self.next_phase: Optional[str] = None
+        self.next_phase: str | None = None
         # Note: current_mode is None for all but the !start machinery
-        self.current_mode: Optional[GameMode] = None
+        self.current_mode: GameMode | None = None
 
     @property
     def in_game(self):
@@ -54,7 +77,15 @@ class PregameState:
         if self.current_mode is not None:
             self.current_mode.teardown()
 
+
 class GameState:
+    """Holds all the game information while a game is running.
+
+    This keeps track of everything - who's playing, what roles they have,
+    what phase it is (day/night), votes, and all that stuff. It gets
+    created when a game starts and lasts until the game ends.
+    """
+
     _init_fns: ClassVar[list[Callable[[GameState], None]]] = []
 
     def __init__(self, pregame_state: PregameState):
@@ -75,7 +106,7 @@ class GameState:
         self.final_roles: UserDict[User, str] = UserDict()
         self._rolestats: set[frozenset[tuple[str, int]]] = set()
         self.current_phase: str = pregame_state.current_phase
-        self.next_phase: Optional[str] = None
+        self.next_phase: str | None = None
         self.night_count: int = 0
         self.day_count: int = 0
         self.rng_seed: bytes = random.get_seed()
@@ -147,6 +178,7 @@ class GameState:
 
     def begin_phase_transition(self, phase: str):
         from src.trans import TIMERS
+
         if self.next_phase is not None:
             raise RuntimeError("already in phase transition")
         self.next_phase = phase
@@ -162,8 +194,11 @@ class GameState:
             TIMERS[f"{self.current_phase}_warn"][0].cancel()
             del TIMERS[f"{self.current_phase}_warn"]
 
-    def end_phase_transition(self, time_limit: int = 0, time_warn: int = 0, timer_cb=None, cb_args=()):
+    def end_phase_transition(
+        self, time_limit: int = 0, time_warn: int = 0, timer_cb=None, cb_args=()
+    ):
         from src.trans import TIMERS
+
         if self.next_phase is None:
             raise RuntimeError("not in phase transition")
 
@@ -186,6 +221,7 @@ class GameState:
     def extend_phase_limit(self, minimum: int = 0):
         """Ensure that the phase limit timer has a minimum amount of seconds remaining."""
         from src.trans import TIMERS
+
         if minimum <= 0:
             return
         if config.Main.get("timers.enabled"):

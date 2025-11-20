@@ -1,8 +1,10 @@
-from typing import Generic, Iterable, Iterator, TypeVar, Optional
+from collections.abc import Iterable, Iterator
+from typing import Generic, TypeVar
 
 __all__ = ["Match", "match_all", "match_one"]
 
 T = TypeVar("T")
+
 
 class Match(Iterable[T], Generic[T]):
     def __init__(self, matches: Iterable[T]):
@@ -22,8 +24,9 @@ class Match(Iterable[T], Generic[T]):
             raise ValueError("Can only call get on a match with a single result")
         return self._matches[0]
 
+
 def match_all(search: str, scope: Iterable[str]) -> Match[str]:
-    """ Retrieve all items that begin with a search term.
+    """Retrieve all items that begin with a search term.
 
     :param search: Term to search for (prefix)
     :param scope: Items to search for matches
@@ -42,8 +45,9 @@ def match_all(search: str, scope: Iterable[str]) -> Match[str]:
             found.add(item)
     return Match(found)
 
-def match_one(search: str, scope: Iterable[str]) -> Optional[str]:
-    """ Retrieve a single item that begins with the search term.
+
+def match_one(search: str, scope: Iterable[str]) -> str | None:
+    """Retrieve a single item that begins with the search term.
 
     :param search: Term to search for (prefix)
     :param scope: Items to search for matches

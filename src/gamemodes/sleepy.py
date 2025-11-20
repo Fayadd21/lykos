@@ -1,22 +1,24 @@
 from collections import Counter, defaultdict
 
+from src import channels, config
 from src.cats import Wolf
-from src.dispatcher import MessageDispatcher
-from src.gamemodes import game_mode, GameMode
-from src.messages import messages
 from src.containers import UserDict, UserSet
 from src.decorators import command, handle_error
-from src.functions import get_players, change_role, get_main_role
+from src.dispatcher import MessageDispatcher
+from src.events import Event, EventListener
+from src.functions import change_role, get_main_role, get_players
+from src.gamemodes import GameMode, game_mode
 from src.gamestate import GameState
-from src.status import remove_all_protections
-from src.events import EventListener, Event
-from src import channels, config
-from src.users import User
+from src.messages import messages
 from src.random import random
+from src.status import remove_all_protections
+from src.users import User
+
 
 @game_mode("sleepy", minp=8, maxp=24)
 class SleepyMode(GameMode):
     """A small village has become the playing ground for all sorts of supernatural beings."""
+
     def __init__(self, arg=""):
         super().__init__(arg)
         self.ROLE_GUIDE = {
@@ -35,7 +37,7 @@ class SleepyMode(GameMode):
             21: ["monster", "hunter"],
             22: ["augur", "amnesiac(2)"],
             23: ["insomniac", "cultist"],
-            24: ["wolf(2)"]
+            24: ["wolf(2)"],
         }
 
         self.TURN_CHANCE = config.Main.get("gameplay.modes.sleepy.turn")
@@ -50,22 +52,32 @@ class SleepyMode(GameMode):
             "remove_protection": EventListener(self.on_remove_protection),
         }
 
-        self.MESSAGE_OVERRIDES = {
-            "mystic_info_nightmare": "mystic_info_night"
-        }
+        self.MESSAGE_OVERRIDES = {"mystic_info_nightmare": "mystic_info_night"}
 
         self.having_nightmare: UserDict[User, User] = UserDict()
         self.nightmare_progress: UserDict[User, int] = UserDict()
         self.nightmare_acted = UserSet()
         # nightmare commands for the person being chased
-        cmd_params = dict(chan=False, pm=True, playing=True, phases=("nightmare",),
-                          users=self.having_nightmare.values(), register=False)
+        cmd_params = dict(
+            chan=False,
+            pm=True,
+            playing=True,
+            phases=("nightmare",),
+            users=self.having_nightmare.values(),
+            register=False,
+        )
         self.hide_cmd = command("hide", **cmd_params)(self.hide)
         self.run_cmd = command("run", **cmd_params)(self.run)
 
         # nightmare commands for dulla
-        cmd_params = dict(chan=False, pm=True, playing=True, phases=("nightmare",),
-                          roles=("dullahan",), register=False)
+        cmd_params = dict(
+            chan=False,
+            pm=True,
+            playing=True,
+            phases=("nightmare",),
+            roles=("dullahan",),
+            register=False,
+        )
         self.search_cmd = command("search", **cmd_params)(self.search)
         self.chase_cmd = command("chase", **cmd_params)(self.chase)
 
@@ -94,6 +106,7 @@ class SleepyMode(GameMode):
 
     def setup_nightmares(self, evt: Event, var: GameState):
         from src.roles.dullahan import KILLS
+
         dullahans = get_players(var, ("dullahan",))
         # don't give nightmares to other dullas, because that'd just be awkward
         filtered = [x for x in KILLS.values() if x not in dullahans]
@@ -104,6 +117,7 @@ class SleepyMode(GameMode):
     @handle_error
     def do_nightmares(self, var: GameState):
         from src.roles.dullahan import KILLS
+
         self.having_nightmare.update(KILLS)
         self.nightmare_progress.clear()
         steps = config.Main.get("gameplay.modes.sleepy.nightmare.steps")
@@ -157,6 +171,7 @@ class SleepyMode(GameMode):
 
     def nightmare_step(self, var: GameState):
         from src.roles.dullahan import KILLS
+
         # keep track of who was already sent messages in case they're being chased by multiple dullahans
         notified = set()
         dulla_counts = defaultdict(int)
@@ -180,21 +195,31 @@ class SleepyMode(GameMode):
                 if remaining == 0 and target not in notified:
                     # target escapes fully
                     notified.add(target)
-                    target.send(messages["sleepy_nightmare_escape_hide"].format(dulla_counts[target]))
+                    target.send(
+                        messages["sleepy_nightmare_escape_hide"].format(dulla_counts[target])
+                    )
                 dulla.send(messages["sleepy_nightmare_fail_hide"])
             elif self.nightmare_progress[target] == 4:
                 # target escapes
                 del self.having_nightmare[dulla]
                 if target not in notified:
                     notified.add(target)
-                    target.send(messages["sleepy_nightmare_escape_run"].format(dulla_counts[target]))
+                    target.send(
+                        messages["sleepy_nightmare_escape_run"].format(dulla_counts[target])
+                    )
                 dulla.send(messages["sleepy_nightmare_fail_river"])
             else:
                 # target still being chased
                 if target not in notified:
                     notified.add(target)
-                    target.send(messages["sleepy_nightmare_target_step_{0}".format(self.nightmare_progress[target])])
-                dulla.send(messages["sleepy_nightmare_dullahan_step"].format(4 - self.nightmare_progress[target]))
+                    target.send(
+                        messages[f"sleepy_nightmare_target_step_{self.nightmare_progress[target]}"]
+                    )
+                dulla.send(
+                    messages["sleepy_nightmare_dullahan_step"].format(
+                        4 - self.nightmare_progress[target]
+                    )
+                )
 
         self.nightmare_acted.clear()
         if self.having_nightmare:
@@ -205,6 +230,7 @@ class SleepyMode(GameMode):
         else:
             # all nightmares resolved, can finally make it daytime
             from src.trans import transition_day
+
             self.nightmare_progress.clear()
             transition_day(var)
 
@@ -254,9 +280,7 @@ class SleepyMode(GameMode):
         if death_triggers and evt.params.main_role == "priest":
             channels.Main.send(messages["sleepy_priest_death"])
 
-            mapping = {"seer": "doomsayer",
-                       "cultist": "demoniac",
-                       "vengeful ghost": "jester"}
+            mapping = {"seer": "doomsayer", "cultist": "demoniac", "vengeful ghost": "jester"}
             for old, new in mapping.items():
                 turn = [p for p in get_players(var, (old,)) if random.random() < self.TURN_CHANCE]
                 for t in turn:
@@ -274,9 +298,11 @@ class SleepyMode(GameMode):
                             continue
                         # otherwise turn only one wolfteam into monster for each seer that turns to doomsayer
                         random.shuffle(can_turn)
-                        change_role(var, can_turn[0], turn_role, "monster", message="sleepy_monster_turn")
+                        change_role(
+                            var, can_turn[0], turn_role, "monster", message="sleepy_monster_turn"
+                        )
                     # messages: sleepy_doomsayer_turn, sleepy_succubus_turn, sleepy_demoniac_turn, sleepy_jester_turn
-                    change_role(var, t, old, new, message="sleepy_{0}_turn".format(new))
+                    change_role(var, t, old, new, message=f"sleepy_{new}_turn")
                     if new == "jester":
                         # VGs turned into jesters remain spicy
                         var.roles["vengeful ghost"].add(t)
@@ -295,10 +321,22 @@ class SleepyMode(GameMode):
                             newstats.add(frozenset(d.items()))
                 var.set_role_stats(newstats)
 
-    def on_remove_protection(self, evt: Event, var: GameState, target: User, attacker: User, attacker_role: str, protector: User, protector_role: str, reason: str):
+    def on_remove_protection(
+        self,
+        evt: Event,
+        var: GameState,
+        target: User,
+        attacker: User,
+        attacker_role: str,
+        protector: User,
+        protector_role: str,
+        reason: str,
+    ):
         if reason == "nightmare":
             evt.data["remove"] = True
 
     def on_revealroles(self, evt: Event, var: GameState):
         if self.having_nightmare:
-            evt.data["output"].append(messages["sleepy_revealroles"].format(self.having_nightmare.values()))
+            evt.data["output"].append(
+                messages["sleepy_revealroles"].format(self.having_nightmare.values())
+            )

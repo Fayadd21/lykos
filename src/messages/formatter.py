@@ -1,13 +1,13 @@
-import string
-import random
 import fnmatch
+import random
+import string
 
 from src import config
 from src.cats import Category
 
 
 class Formatter(string.Formatter):
-    """ Custom formatter for message strings.
+    """Custom formatter for message strings.
 
     This inherits all features of base str.format() with the following additions:
     - Prefixing a value with = will treat it as a literal. It will be a list if the value contains commas,
@@ -37,6 +37,7 @@ class Formatter(string.Formatter):
     - New convert type "!phase" to indicate the value is a game phase name (and will be translated appropriately).
     - New convert type "!message" to indicate the value is a message key; it will be recursively expanded.
     """
+
     def get_value(self, key, args, kwargs):
         try:
             if key[0] == "=":
@@ -125,7 +126,7 @@ class Formatter(string.Formatter):
         remain = []
         for spec, arg in specs.items():
             if arg is not None:
-                remain.append("{0}({1})".format(spec, arg))
+                remain.append(f"{spec}({arg})")
             else:
                 remain.append(spec)
 
@@ -133,7 +134,7 @@ class Formatter(string.Formatter):
         return super().format_field(value, format_spec)
 
     def convert_field(self, value, conversion):
-        from src.messages import messages, LocalRole, LocalMode, LocalTotem
+        from src.messages import LocalMode, LocalRole, LocalTotem, messages
 
         if conversion == "role":
             if isinstance(value, LocalRole):
@@ -180,7 +181,7 @@ class Formatter(string.Formatter):
             if rule["number"] is None or rule["number"] == num:
                 return value[rule["index"]]
 
-        raise ValueError("No plural rules matched the number {0!r} in language metadata!".format(num))
+        raise ValueError(f"No plural rules matched the number {num!r} in language metadata!")
 
     def _random(self, value, arg):
         return random.choice(value)
@@ -190,6 +191,7 @@ class Formatter(string.Formatter):
 
     def _join_simple(self, value, arg, sort=False):
         from src.messages import messages
+
         # join using only a comma (in English), regardless of the number of list items
         normal_chars = messages.raw("_metadata", "list")
         simple = normal_chars[1]
@@ -214,7 +216,7 @@ class Formatter(string.Formatter):
         if not join_chars:
             join_chars = messages.raw("_metadata", "list")
 
-        value = list(value) # make sure we can index it
+        value = list(value)  # make sure we can index it
 
         def fmt(s):
             if conv:
@@ -233,9 +235,7 @@ class Formatter(string.Formatter):
         elif len(value) == 2:
             return join_chars[0].join(value)
         else:
-            return (join_chars[1].join(value[:-1])
-                    + join_chars[2]
-                    + value[-1])
+            return join_chars[1].join(value[:-1]) + join_chars[2] + value[-1]
 
     def _article(self, value, arg):
         from src.messages import messages
@@ -244,11 +244,11 @@ class Formatter(string.Formatter):
             if rule["pattern"] is None or fnmatch.fnmatch(value, rule["pattern"]):
                 return rule["article"]
 
-        raise ValueError("No article rules matched the value {0!r} in language metadata!".format(value))
+        raise ValueError(f"No article rules matched the value {value!r} in language metadata!")
 
     def _bold(self, value, arg):
         # FIXME make this transport-agnostic
-        return "\u0002{0}\u0002".format(value)
+        return f"\u0002{value}\u0002"
 
     def _capitalize(self, value, arg):
         return value.capitalize()

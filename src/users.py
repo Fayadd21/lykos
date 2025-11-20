@@ -1,30 +1,45 @@
 from __future__ import annotations
 
 import fnmatch
-import time
 import re
-from typing import Callable, Optional, Iterable, TYPE_CHECKING
+import time
+from collections.abc import Callable, Iterable
+from typing import TYPE_CHECKING
 
-from src.context import IRCContext, Features, NotLoggedIn, lower
 from src import config, db
-from src.events import Event, EventListener
+from src.context import Features, IRCContext, NotLoggedIn, lower
 from src.debug import CheckedDict, CheckedSet, handle_error
+from src.events import Event, EventListener
 from src.match import Match
 from src.transport.irc import get_services
 
 if TYPE_CHECKING:
-    from src.containers import UserSet, UserDict, UserList
-    from src.gamestate import GameState
     from src.channels import Channel
+    from src.containers import UserDict, UserList, UserSet
+    from src.gamestate import GameState
 
-__all__ = ["Bot", "predicate", "get", "add", "users", "disconnected", "complete_match",
-           "parse_rawnick", "parse_rawnick_as_dict", "User", "FakeUser", "BotUser"]
+__all__ = [
+    "Bot",
+    "predicate",
+    "get",
+    "add",
+    "users",
+    "disconnected",
+    "complete_match",
+    "parse_rawnick",
+    "parse_rawnick_as_dict",
+    "User",
+    "FakeUser",
+    "BotUser",
+]
 
-Bot: BotUser = None # type: ignore[assignment]
+Bot: BotUser = None  # type: ignore[assignment]
 
 _users: CheckedSet[User] = CheckedSet("users._users")
 _ghosts: CheckedSet[User] = CheckedSet("users._ghosts")
-_pending_account_updates: CheckedDict[User, CheckedDict[str, Callable]] = CheckedDict("users._pending_account_updates")
+_pending_account_updates: CheckedDict[User, CheckedDict[str, Callable]] = CheckedDict(
+    "users._pending_account_updates"
+)
 
 _arg_msg = "(user={0:for_tb_verbose}, allow_bot={1})"
 
@@ -33,7 +48,19 @@ _arg_msg = "(user={0:for_tb_verbose}, allow_bot={1})"
 # testing, where we might want everyone to be fake nicks.
 predicate = re.compile(r"^[0-9]+$").search
 
-def get(nick=None, ident=None, host=None, account=None, *, allow_multiple=False, allow_none=False, allow_bot=False, allow_ghosts=False, update=False):
+
+def get(
+    nick=None,
+    ident=None,
+    host=None,
+    account=None,
+    *,
+    allow_multiple=False,
+    allow_none=False,
+    allow_bot=False,
+    allow_ghosts=False,
+    update=False,
+):
     """Return the matching user(s) from the user list.
 
     :param nick: Nickname or raw nick (nick!ident@host) to match.
@@ -76,7 +103,7 @@ def get(nick=None, ident=None, host=None, account=None, *, allow_multiple=False,
         try:
             users.add(Bot)
         except ValueError:
-            pass # Bot may not be hashable in early init; this is fine and User.__new__ handles this gracefully
+            pass  # Bot may not be hashable in early init; this is fine and User.__new__ handles this gracefully
 
     for user in users:
         if update and have_raw_nick:
@@ -85,7 +112,14 @@ def get(nick=None, ident=None, host=None, account=None, *, allow_multiple=False,
                 # changing rawnick could swap user out, so we need to fetch the new instance
                 # (with update=False to avoid recursion)
                 user.rawnick = raw_nick
-                return get(raw_nick, allow_multiple=allow_multiple, allow_none=allow_none, allow_bot=allow_bot, allow_ghosts=allow_ghosts, update=False)
+                return get(
+                    raw_nick,
+                    allow_multiple=allow_multiple,
+                    allow_none=allow_none,
+                    allow_bot=allow_bot,
+                    allow_ghosts=allow_ghosts,
+                    update=False,
+                )
         elif user.partial_match(temp):
             potential.append(user)
 
@@ -96,13 +130,13 @@ def get(nick=None, ident=None, host=None, account=None, *, allow_multiple=False,
         return potential[0]
 
     if len(potential) > 1:
-        raise ValueError("More than one user matches: " +
-              _arg_msg.format(temp, allow_bot))
+        raise ValueError("More than one user matches: " + _arg_msg.format(temp, allow_bot))
 
     if not allow_none:
         raise KeyError(_arg_msg.format(temp, allow_bot))
 
     return None
+
 
 def add(cli, *, nick, ident=None, host=None, account=NotLoggedIn):
     """Create a new user, add it to the user list and return it.
@@ -132,16 +166,19 @@ def add(cli, *, nick, ident=None, host=None, account=NotLoggedIn):
 
     return new
 
+
 def users():
     """Iterate over the users in the registry."""
     yield from _users
+
 
 def disconnected():
     """Iterate over the users who are in-game but disconnected."""
     yield from _ghosts
 
-def complete_match(pattern: str, scope: Optional[Iterable[User]] = None):
-    """ Find a user or users who match the given pattern.
+
+def complete_match(pattern: str, scope: Iterable[User] | None = None):
+    """Find a user or users who match the given pattern.
 
     :param pattern: Pattern to match on. The format is "[nick][:account]",
         with [] denoting an optional field. Exact matches are tried, and then
@@ -169,7 +206,9 @@ def complete_match(pattern: str, scope: Optional[Iterable[User]] = None):
                     matches.clear()
                     direct_match = True
                 matches.append(user)
-            elif not direct_match and (nick.startswith(nick_search) or stripped_nick.startswith(nick_search)):
+            elif not direct_match and (
+                nick.startswith(nick_search) or stripped_nick.startswith(nick_search)
+            ):
                 matches.append(user)
         else:
             matches.append(user)
@@ -180,7 +219,7 @@ def complete_match(pattern: str, scope: Optional[Iterable[User]] = None):
         direct_match = False
         for user in scope:
             if not user.account:
-                continue # fakes don't have accounts, so this search won't be able to find them
+                continue  # fakes don't have accounts, so this search won't be able to find them
             acct = lower(user.account)
             stripped_acct = acct.lstrip("[{\\^_`|}]")
             if acct == acct_search:
@@ -188,22 +227,28 @@ def complete_match(pattern: str, scope: Optional[Iterable[User]] = None):
                     matches.clear()
                     direct_match = True
                 matches.append(user)
-            elif not direct_match and (acct.startswith(acct_search) or stripped_acct.startswith(acct_search)):
+            elif not direct_match and (
+                acct.startswith(acct_search) or stripped_acct.startswith(acct_search)
+            ):
                 matches.append(user)
 
     return Match(matches)
 
+
 _raw_nick_pattern = re.compile(r"^(?P<nick>.+?)(?:!(?P<ident>.+?)@(?P<host>.+))?$")
+
 
 def parse_rawnick(rawnick, *, default=None):
     """Return a tuple of (nick, ident, host) from rawnick."""
 
     return _raw_nick_pattern.search(rawnick).groups(default)
 
+
 def parse_rawnick_as_dict(rawnick, *, default=None):
     """Return a dict of {"nick": nick, "ident": ident, "host": host}."""
 
     return _raw_nick_pattern.search(rawnick).groupdict(default)
+
 
 def _cleanup_user(evt, var: GameState, user: User):
     """Removes a user from our global tracking set once it has left all channels."""
@@ -216,12 +261,14 @@ def _cleanup_user(evt, var: GameState, user: User):
         user.disconnected = False
         _users.discard(user)
 
+
 def _reset(evt, var):
     """Cleans up users that left during game during game end."""
     for user in _ghosts:
         if not user.channels:
             _users.discard(user)
     _ghosts.clear()
+
 
 def _update_account(evt, user):
     """Updates account data of a user for networks which don't support certain features."""
@@ -235,14 +282,15 @@ def _update_account(evt, user):
             # does not prevent other registered callbacks from running
             handle_error(callback)(user)
 
+
 # Can't use @event_listener decorator since src/decorators.py imports us
 # (meaning decorator isn't defined at the point in time we are run)
 EventListener(_cleanup_user).install("cleanup_user")
 EventListener(_reset).install("reset")
 EventListener(_update_account).install("who_end")
 
-class User(IRCContext):
 
+class User(IRCContext):
     is_user = True
 
     _ident: str
@@ -279,7 +327,12 @@ class User(IRCContext):
         self.dict_values = []
         self.account_timestamp = time.time()
 
-        if Bot is not None and nick is not None and Bot.nick.rstrip("_") == nick.rstrip("_") and None in {Bot.ident, Bot.host}:
+        if (
+            Bot is not None
+            and nick is not None
+            and Bot.nick.rstrip("_") == nick.rstrip("_")
+            and None in {Bot.ident, Bot.host}
+        ):
             # Bot ident/host being None means that this user isn't hashable, so it cannot be in any containers
             # which store by hash. As such, mutating the properties is safe.
             self = Bot
@@ -292,9 +345,16 @@ class User(IRCContext):
             self.timestamp = time.time()
             self.account_timestamp = time.time()
 
-        elif (cls.__name__ == "User" and Bot is not None
-              and Bot.nick == nick and ident is not None and host is not None
-              and Bot.ident != ident and Bot.host == host and Bot.account == account):
+        elif (
+            cls.__name__ == "User"
+            and Bot is not None
+            and Bot.nick == nick
+            and ident is not None
+            and host is not None
+            and Bot.ident != ident
+            and Bot.host == host
+            and Bot.account == account
+        ):
             # Messages sent in early init may give us an incorrect ident (such as because we're waiting for
             # a response from identd, or there is some *line which overrides the ident for the bot).
             # Since Bot.ident attempts to create a new BotUser, we guard against recursion by only following this
@@ -353,7 +413,7 @@ class User(IRCContext):
                     if potential is None:
                         potential = user
                     else:
-                        break # too many possibilities
+                        break  # too many possibilities
             else:
                 if potential is not None:
                     self = potential
@@ -361,20 +421,20 @@ class User(IRCContext):
         return self
 
     def __str__(self):
-        return "{self.__class__.__name__}: {self.nick}!{self.ident}@{self.host}:{self.account}".format(self=self)
+        return f"{self.__class__.__name__}: {self.nick}!{self.ident}@{self.host}:{self.account}"
 
     def __repr__(self):
-        return "{self.__class__.__name__}({self.nick!r}, {self.ident!r}, {self.host!r}, {self.account!r}, {self.channels!r})".format(self=self)
+        return f"{self.__class__.__name__}({self.nick!r}, {self.ident!r}, {self.host!r}, {self.account!r}, {self.channels!r})"
 
     def __format__(self, format_spec):
         if format_spec == "@":
-            return "\u0002{0}\u0002".format(self.name)
+            return f"\u0002{self.name}\u0002"
         elif format_spec in ("for_tb", "for_tb_verbose"):
             user_data_level = config.Main.get("telemetry.errors.user_data_level")
             if user_data_level == 0:
-                return "{self.__class__.__name__}({0:x})".format(id(self), self=self)
+                return f"{self.__class__.__name__}({id(self):x})"
             elif user_data_level == 1 or format_spec == "for_tb":
-                return "{self.__class__.__name__}({self.nick!r}, {0:x})".format(id(self), self=self)
+                return f"{self.__class__.__name__}({self.nick!r}, {id(self):x})"
             else:
                 return repr(self)
         return super().__format__(format_spec)
@@ -386,11 +446,13 @@ class User(IRCContext):
         return hash((self.nick, self.ident, self.host, self.account))
 
     def __eq__(self, other):
-        return (isinstance(other, User)
-                and self.nick == other.nick
-                and self.ident == other.ident
-                and self.host == other.host
-                and self.account == other.account)
+        return (
+            isinstance(other, User)
+            and self.nick == other.nick
+            and self.ident == other.ident
+            and self.host == other.host
+            and self.account == other.account
+        )
 
     def __lt__(self, other):
         if not isinstance(other, User):
@@ -431,11 +493,11 @@ class User(IRCContext):
             does not lose any data.
         """
         if self is new:
-            return # as far as the caller is aware, we've swapped
+            return  # as far as the caller is aware, we've swapped
 
         _ghosts.discard(self)
         if not self.channels or same_user:
-            _users.discard(self) # Goodbye, my old friend
+            _users.discard(self)  # Goodbye, my old friend
 
         for lst in self.lists[:]:
             while self in lst:
@@ -476,8 +538,14 @@ class User(IRCContext):
         assert not self.lists and not self.sets and not self.dict_keys and not self.dict_values
 
     def lower(self):
-        temp = type(self)(self.client, lower(self.nick), lower(self.ident), lower(self.host, casemapping="ascii"), lower(self.account))
-        if temp is not self: # If everything is already lowercase, we'll get back the same instance
+        temp = type(self)(
+            self.client,
+            lower(self.nick),
+            lower(self.ident),
+            lower(self.host, casemapping="ascii"),
+            lower(self.account),
+        )
+        if temp is not self:  # If everything is already lowercase, we'll get back the same instance
             temp.channels = self.channels
             temp.ref = self.ref or self
         return temp
@@ -529,9 +597,11 @@ class User(IRCContext):
         nick, ident, host = re.match("(?:(?:(.*?)!)?(.*?)@)?(.*)", hostmask).groups("")
         temp = self.lower()
 
-        return ((not nick or fnmatch.fnmatch(temp.nick, lower(nick))) and
-                (not ident or fnmatch.fnmatch(temp.ident, lower(ident))) and
-                fnmatch.fnmatch(temp.host, lower(host, casemapping="ascii")))
+        return (
+            (not nick or fnmatch.fnmatch(temp.nick, lower(nick)))
+            and (not ident or fnmatch.fnmatch(temp.ident, lower(ident)))
+            and fnmatch.fnmatch(temp.host, lower(host, casemapping="ascii"))
+        )
 
     def prefers_notice(self):
         return self.lower().account in db.PREFER_NOTICE
@@ -580,7 +650,6 @@ class User(IRCContext):
             passed in the updated user with an accurate account
         """
 
-        _ignore_locals_ = True
         # Nothing to update for fake nicks
         if self.is_fake:
             callback(self)
@@ -592,9 +661,10 @@ class User(IRCContext):
             return
 
         # at this point we might actually care about locals in tracebacks when debugging account tracking issues
-        _ignore_locals_ = False
         services = get_services()
-        if self.account and (not services.supports_account_change() or self.account_timestamp > time.time() - 900):
+        if self.account and (
+            not services.supports_account_change() or self.account_timestamp > time.time() - 900
+        ):
             # account data is less than 15 minutes old or we can't change accounts on this ircd,
             # use existing data instead of refreshing
             callback(self)
@@ -621,10 +691,10 @@ class User(IRCContext):
             self.who()
         else:
             # Fallback to WHOIS
-            self.client.send("WHOIS {0}".format(self))
+            self.client.send(f"WHOIS {self}")
 
     @property
-    def nick(self): # name should be the same as nick (for length calculation)
+    def nick(self):  # name should be the same as nick (for length calculation)
         return self.name
 
     @nick.setter
@@ -651,7 +721,7 @@ class User(IRCContext):
         self.swap(new, same_user=True)
 
     @property
-    def account(self): # automatically converts "0" and "*" to None
+    def account(self):  # automatically converts "0" and "*" to None
         return self._account
 
     @account.setter
@@ -666,7 +736,7 @@ class User(IRCContext):
     def rawnick(self):
         if self.nick is None or self.ident is None or self.host is None:
             return None
-        return "{self.nick}!{self.ident}@{self.host}".format(self=self)
+        return f"{self.nick}!{self.ident}@{self.host}"
 
     @rawnick.setter
     def rawnick(self, value):
@@ -695,10 +765,11 @@ class User(IRCContext):
         # which game the user is currently playing in (assuming that a
         # user can only belong to one game at a time)
         from src import channels
+
         return channels.Main.game_state
 
-class FakeUser(User):
 
+class FakeUser(User):
     is_fake = True
 
     def __hash__(self):
@@ -708,7 +779,7 @@ class FakeUser(User):
         if format_spec in ("for_tb", "for_tb_verbose") and self.nick.startswith("@"):
             # fakes starting with @ are used internally for various purposes (such as @WolvesAgree@)
             # so it'd be good to keep that around when debugging in tracebacks
-            return "{self.__class__.__name__}({self.nick!r})".format(self=self)
+            return f"{self.__class__.__name__}({self.nick!r})"
         return super().__format__(format_spec)
 
     @classmethod
@@ -725,14 +796,14 @@ class FakeUser(User):
 
     @property
     def rawnick(self):
-        return self.nick # we don't have a raw nick
+        return self.nick  # we don't have a raw nick
 
     @rawnick.setter
     def rawnick(self, value):
         raise ValueError("may not change the raw nick of a fake user")
 
-class BotUser(User): # TODO: change all the 'if x is Bot' for 'if isinstance(x, BotUser)'
 
+class BotUser(User):  # TODO: change all the 'if x is Bot' for 'if isinstance(x, BotUser)'
     def __init__(self, cli, nick, ident, host, account):
         if not self._initialized:
             self.modes = set()
@@ -744,7 +815,7 @@ class BotUser(User): # TODO: change all the 'if x is Bot' for 'if isinstance(x, 
         self.client.send("NICK", nick)
 
     @property
-    def nick(self): # name should be the same as nick (for length calculation)
+    def nick(self):  # name should be the same as nick (for length calculation)
         return self.name
 
     @nick.setter
@@ -774,7 +845,7 @@ class BotUser(User): # TODO: change all the 'if x is Bot' for 'if isinstance(x, 
         self.swap(new, same_user=True)
 
     @property
-    def account(self): # automatically converts "0" and "*" to None
+    def account(self):  # automatically converts "0" and "*" to None
         return self._account
 
     @account.setter
@@ -788,7 +859,7 @@ class BotUser(User): # TODO: change all the 'if x is Bot' for 'if isinstance(x, 
     def rawnick(self):
         if self.nick is None or self.ident is None or self.host is None:
             return None
-        return "{self.nick}!{self.ident}@{self.host}".format(self=self)
+        return f"{self.nick}!{self.ident}@{self.host}"
 
     @rawnick.setter
     def rawnick(self, value):
@@ -805,7 +876,7 @@ class BotUser(User): # TODO: change all the 'if x is Bot' for 'if isinstance(x, 
 
     @disconnected.setter
     def disconnected(self, value):
-        pass # no-op
+        pass  # no-op
 
     @property
     def game_state(self):

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from src.cats import Hidden, Wolfteam
 from src.events import Event, event_listener
 from src.functions import get_players
@@ -22,8 +20,18 @@ def on_send_role(evt: Event, var: GameState):
                 cultist.queue_message(messages["cultist_notify"])
             User.send_messages()
 
+
 @event_listener("chk_win", priority=3)
-def on_chk_win(evt: Event, var: GameState, rolemap: dict[str, set[User]], mainroles: dict[User, str], lpl: int, lwolves: int, lrealwolves: int, lvampires: int):
+def on_chk_win(
+    evt: Event,
+    var: GameState,
+    rolemap: dict[str, set[User]],
+    mainroles: dict[User, str],
+    lpl: int,
+    lwolves: int,
+    lrealwolves: int,
+    lvampires: int,
+):
     if evt.data["winner"] is not None or lvampires > 0:
         return
     if lwolves == lpl / 2:
@@ -33,7 +41,8 @@ def on_chk_win(evt: Event, var: GameState, rolemap: dict[str, set[User]], mainro
         evt.data["winner"] = Wolfteam
         evt.data["message"] = messages["wolf_win_greater"]
 
+
 @event_listener("get_role_metadata")
-def on_get_role_metadata(evt: Event, var: Optional[GameState], kind: str):
+def on_get_role_metadata(evt: Event, var: GameState | None, kind: str):
     if kind == "role_categories":
         evt.data["cultist"] = {"Wolfteam", "Evil", "Hidden Eligible"}

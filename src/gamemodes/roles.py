@@ -1,9 +1,10 @@
 from collections import Counter
 
+from src import cats, config
 from src.cats import Hidden_Eligible
-from src.gamemodes import game_mode, GameMode, InvalidModeException
+from src.gamemodes import GameMode, InvalidModeException, game_mode
 from src.messages import messages
-from src import events, channels, users, cats, config
+
 
 @game_mode("roles", minp=4, maxp=35)
 class ChangedRolesMode(GameMode):

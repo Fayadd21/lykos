@@ -1,21 +1,29 @@
-from src.cats import Wolfteam, Village
-from src.gamemodes import game_mode, GameMode, InvalidModeException
-from src.messages import messages
+from src.cats import Village, Wolfteam
+from src.events import Event, EventListener
 from src.functions import get_players
+from src.gamemodes import GameMode, game_mode
 from src.gamestate import GameState
-from src.events import EventListener, Event
-from src import channels, users
+from src.messages import messages
+
 
 # original idea by Rossweisse, implemented by Vgr with help from woffle and jacob1
 @game_mode("guardian", minp=7, maxp=24)
 class GuardianMode(GameMode):
     """Game mode full of guardian angels, wolves need to pick them apart!"""
+
     def __init__(self, arg=""):
         super().__init__(arg)
         self.CUSTOM_SETTINGS.limit_abstain = False
         self.ROLE_GUIDE = {
-            7:  ["werekitten", "cultist", "seer", "guardian angel", "cursed villager", "cursed villager(2)"],
-            8:  ["wolf", "village drunk", "-cultist"],
+            7: [
+                "werekitten",
+                "cultist",
+                "seer",
+                "guardian angel",
+                "cursed villager",
+                "cursed villager(2)",
+            ],
+            8: ["wolf", "village drunk", "-cultist"],
             10: ["werecrow", "shaman"],
             12: ["alpha wolf", "guardian angel(2)", "cursed villager(3)"],
             13: ["jester", "gunner"],
@@ -24,32 +32,32 @@ class GuardianMode(GameMode):
             19: ["wolf gunner", "investigator"],
             21: ["amnesiac(2)"],
             22: ["minion"],
-            23: ["vigilante"]
+            23: ["vigilante"],
         }
         self.TOTEM_CHANCES = {
-            "death"         : {"shaman": 10},
-            "protection"    : {"shaman": 0},
-            "silence"       : {"shaman": 10},
-            "revealing"     : {"shaman": 20},
-            "desperation"   : {"shaman": 0},
-            "impatience"    : {"shaman": 0},
-            "pacifism"      : {"shaman": 0},
-            "influence"     : {"shaman": 20},
-            "narcolepsy"    : {"shaman": 0},
-            "exchange"      : {"shaman": 0},
-            "lycanthropy"   : {"shaman": 0},
-            "luck"          : {"shaman": 10},
-            "pestilence"    : {"shaman": 0},
-            "retribution"   : {"shaman": 10},
-            "misdirection"  : {"shaman": 20},
-            "deceit"        : {"shaman": 0},
+            "death": {"shaman": 10},
+            "protection": {"shaman": 0},
+            "silence": {"shaman": 10},
+            "revealing": {"shaman": 20},
+            "desperation": {"shaman": 0},
+            "impatience": {"shaman": 0},
+            "pacifism": {"shaman": 0},
+            "influence": {"shaman": 20},
+            "narcolepsy": {"shaman": 0},
+            "exchange": {"shaman": 0},
+            "lycanthropy": {"shaman": 0},
+            "luck": {"shaman": 10},
+            "pestilence": {"shaman": 0},
+            "retribution": {"shaman": 10},
+            "misdirection": {"shaman": 20},
+            "deceit": {"shaman": 0},
         }
         self.set_default_totem_chances()
-        self.EVENTS = {
-            "chk_win": EventListener(self.chk_win)
-        }
+        self.EVENTS = {"chk_win": EventListener(self.chk_win)}
 
-    def chk_win(self, evt: Event, var: GameState, rolemap, mainroles, lpl, lwolves, lrealwolves, lvampires):
+    def chk_win(
+        self, evt: Event, var: GameState, rolemap, mainroles, lpl, lwolves, lrealwolves, lvampires
+    ):
         lguardians = len(get_players(var, ["guardian angel", "bodyguard"], mainroles=mainroles))
 
         if lpl < 1:

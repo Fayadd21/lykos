@@ -1,31 +1,43 @@
 from __future__ import annotations
 
 import itertools
-from typing import Optional
 
+from src import users
 from src.cats import Category
 from src.decorators import command
 from src.dispatcher import MessageDispatcher
 from src.events import Event, event_listener
-from src.functions import get_players, get_all_players
+from src.functions import get_all_players, get_players
 from src.gamestate import GameState
 from src.messages import messages
-from src.roles.helper.shamans import setup_variables, get_totem_target, give_totem, totem_message
-from src.status import is_silent
-from src import users
-from src.users import User
 from src.random import random
+from src.roles.helper.shamans import get_totem_target, give_totem, setup_variables, totem_message
+from src.status import is_silent
+from src.users import User
 
-TOTEMS, LASTGIVEN, SHAMANS, RETARGET, ORIG_TARGET_MAP = setup_variables("crazed shaman", knows_totem=False)
+TOTEMS, LASTGIVEN, SHAMANS, RETARGET, ORIG_TARGET_MAP = setup_variables(
+    "crazed shaman", knows_totem=False
+)
 
-@command("totem", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("crazed shaman",))
+
+@command(
+    "totem",
+    chan=False,
+    pm=True,
+    playing=True,
+    silenced=True,
+    phases=("night",),
+    roles=("crazed shaman",),
+)
 def crazed_shaman_totem(wrapper: MessageDispatcher, message: str):
     """Give a random totem to a player."""
 
     var = wrapper.game_state
 
     totem_types = list(TOTEMS[wrapper.source].keys())
-    totem, target = get_totem_target(var, wrapper, message, LASTGIVEN, []) # don't pass totem_types so they can't autocomplete what random totems they have
+    totem, target = get_totem_target(
+        var, wrapper, message, LASTGIVEN, []
+    )  # don't pass totem_types so they can't autocomplete what random totems they have
     if not target:
         return
 
@@ -36,7 +48,7 @@ def crazed_shaman_totem(wrapper: MessageDispatcher, message: str):
         if given < total:
             totem = type
             break
-    else: # all totems are given out, change targets for a random one
+    else:  # all totems are given out, change targets for a random one
         totem = random.choice(totem_types)
 
     orig_target = target
@@ -45,7 +57,9 @@ def crazed_shaman_totem(wrapper: MessageDispatcher, message: str):
         wrapper.send(messages["shaman_no_stacking"].format(orig_target))
         return
 
-    given = give_totem(var, wrapper, orig_target, totem, key="shaman_success_night_unknown", role="crazed shaman")
+    given = give_totem(
+        var, wrapper, orig_target, totem, key="shaman_success_night_unknown", role="crazed shaman"
+    )
     if given:
         victim, target = given
         if victim is not target:
@@ -55,10 +69,21 @@ def crazed_shaman_totem(wrapper: MessageDispatcher, message: str):
         if len(SHAMANS[wrapper.source][totem]) > TOTEMS[wrapper.source][totem]:
             SHAMANS[wrapper.source][totem].pop(0)
 
+
 @event_listener("player_win")
-def on_player_win(evt: Event, var: GameState, player: User, main_role: str, all_roles: set[str], winner: Category, team_win: bool, survived: bool):
+def on_player_win(
+    evt: Event,
+    var: GameState,
+    player: User,
+    main_role: str,
+    all_roles: set[str],
+    winner: Category,
+    team_win: bool,
+    survived: bool,
+):
     if main_role == "crazed shaman":
         evt.data["count_game"] = False
+
 
 @event_listener("transition_day_begin", priority=4)
 def on_transition_day_begin(evt: Event, var: GameState):
@@ -82,9 +107,17 @@ def on_transition_day_begin(evt: Event, var: GameState):
                     target = random.choice(ps)
                     ps.remove(target)
                     dispatcher = MessageDispatcher(shaman, users.Bot)
-                    given = give_totem(var, dispatcher, target, totem, key="shaman_success_random_unknown", role="crazed shaman")
+                    given = give_totem(
+                        var,
+                        dispatcher,
+                        target,
+                        totem,
+                        key="shaman_success_random_unknown",
+                        role="crazed shaman",
+                    )
                     if given:
                         SHAMANS[shaman][totem].append(given[0])
+
 
 @event_listener("send_role")
 def on_send_role(evt: Event, var: GameState):
@@ -137,12 +170,14 @@ def on_send_role(evt: Event, var: GameState):
         shaman.send(totem_message(TOTEMS[shaman], count_only=True))
         shaman.send(messages["players_list"].format(pl))
 
+
 @event_listener("get_role_metadata")
-def on_get_role_metadata(evt: Event, var: Optional[GameState], kind: str):
+def on_get_role_metadata(evt: Event, var: GameState | None, kind: str):
     if kind == "role_categories":
         evt.data["crazed shaman"] = {"Neutral", "Nocturnal"}
     elif kind == "lycanthropy_role":
         evt.data["crazed shaman"] = {"role": "wolf shaman", "prefix": "shaman"}
+
 
 @event_listener("default_totems")
 def set_crazed_totems(evt: Event, chances: dict[str, dict[str, int]]):

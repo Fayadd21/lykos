@@ -1,12 +1,13 @@
 import random
-from antlr4 import InputStream, CommonTokenStream, ParseTreeWalker
+
+from antlr4 import CommonTokenStream, InputStream, ParseTreeWalker
 from antlr4.error.ErrorListener import ErrorListener
 
 from src import config
 from src.messages import message_formatter
 from src.messages.lexer import Lexer
-from src.messages.parser import Parser
 from src.messages.listener import Listener
+from src.messages.parser import Parser
 
 __all__ = ["Message"]
 
@@ -54,10 +55,12 @@ class Message:
             walker.walk(listener, tree)
             return listener.value()
         except Exception as e:
-            if not config.Main.get("debug.enabled") or not config.Main.get("debug.messages.nothrow"):
+            if not config.Main.get("debug.enabled") or not config.Main.get(
+                "debug.messages.nothrow"
+            ):
                 raise
 
-            return "ERROR: {0!s} ({1}: {2!r}, {3!r})".format(e, self.key, args, kwargs)
+            return f"ERROR: {e!s} ({self.key}: {args!r}, {kwargs!r})"
 
 
 class MessageErrorListener(ErrorListener):
@@ -67,5 +70,8 @@ class MessageErrorListener(ErrorListener):
     Then it tries to call our tree listener with bad parse state, which causes things to blow up down the line.
     The exception messages from that are less-than intuitive, when we really just want to know the message itself
     is bad."""
+
     def syntaxError(self, recognizer, offending_symbol, line, column, msg, e):
-        raise RuntimeError("Ill-formed message \"{0}\" (offset {1}): {2}".format(recognizer.message_key, column, msg))
+        raise RuntimeError(
+            f'Ill-formed message "{recognizer.message_key}" (offset {column}): {msg}'
+        )

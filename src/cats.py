@@ -28,9 +28,10 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 import itertools
-from typing import Iterable, TYPE_CHECKING, Collection
+from collections import defaultdict
+from collections.abc import Collection, Iterable
+from typing import TYPE_CHECKING
 
 from src.events import Event, EventListener
 
@@ -38,10 +39,36 @@ if TYPE_CHECKING:
     from src.gamestate import GameState
 
 __all__ = [
-    "get", "get_team", "role_order", "all_cats", "all_roles", "all_teams", "Category",
-    "Wolf", "Wolfchat", "Wolfteam", "Killer", "Village", "Nocturnal", "Neutral", "Win_Stealer", "Hidden", "Safe",
-    "Spy", "Intuitive", "Cursed", "Innocent", "Team_Switcher", "Wolf_Objective", "Village_Objective",
-    "Vampire", "Vampire_Team", "Vampire_Objective", "Hidden_Eligible", "All", "Nobody"
+    "get",
+    "get_team",
+    "role_order",
+    "all_cats",
+    "all_roles",
+    "all_teams",
+    "Category",
+    "Wolf",
+    "Wolfchat",
+    "Wolfteam",
+    "Killer",
+    "Village",
+    "Nocturnal",
+    "Neutral",
+    "Win_Stealer",
+    "Hidden",
+    "Safe",
+    "Spy",
+    "Intuitive",
+    "Cursed",
+    "Innocent",
+    "Team_Switcher",
+    "Wolf_Objective",
+    "Village_Objective",
+    "Vampire",
+    "Vampire_Team",
+    "Vampire_Objective",
+    "Hidden_Eligible",
+    "All",
+    "Nobody",
 ]
 
 _dict_keys = type(dict().keys())  # type: ignore
@@ -52,19 +79,31 @@ ROLE_CATS: dict[str, Category] = {}
 # the ordering in which we list roles (values should be categories, and roles are ordered within the categories in alphabetical order,
 # with exception that wolf is first in the wolf category and villager is last in the village category)
 # Roles which are always secondary roles in a particular game mode are always listed last (after everything else is done)
-ROLE_ORDER = ["Wolf", "Wolfchat", "Wolfteam", "Vampire", "Vampire Team", "Village", "Hidden", "Win Stealer", "Neutral"]
+ROLE_ORDER = [
+    "Wolf",
+    "Wolfchat",
+    "Wolfteam",
+    "Vampire",
+    "Vampire Team",
+    "Village",
+    "Hidden",
+    "Win Stealer",
+    "Neutral",
+]
 
 FROZEN = False
 
 ROLES: dict[str, Collection[str]] = {}
 TEAMS: set[Category] = set()
 
+
 def get(cat: str) -> Category:
     if not FROZEN:
         raise RuntimeError("Fatal: Role categories are not ready")
     if cat not in ROLE_CATS:
-        raise ValueError("{0!r} is not a valid role category".format(cat))
+        raise ValueError(f"{cat!r} is not a valid role category")
     return ROLE_CATS[cat]
+
 
 def role_order() -> Iterable[str]:
     if not FROZEN:
@@ -90,11 +129,13 @@ def role_order() -> Iterable[str]:
                 roles.append(role)
     return itertools.chain.from_iterable([buckets[tag] for tag in ROLE_ORDER])
 
+
 def all_cats() -> dict[str, Category]:
     if not FROZEN:
         raise RuntimeError("Fatal: Role categories are not ready")
     # make a copy so that the original cannot be mutated and skip the * alias
     return {k: v for k, v in ROLE_CATS.items() if k != "*"}
+
 
 def all_roles() -> dict[str, list[Category]]:
     if not FROZEN:
@@ -109,6 +150,7 @@ def all_roles() -> dict[str, list[Category]]:
         roles[role] = [next(iter(main_cat))] + sorted(iter(cats), key=str)
     return roles
 
+
 def all_teams() -> Iterable[Category]:
     if not FROZEN:
         raise RuntimeError("Fatal: Role categories are not ready")
@@ -116,6 +158,7 @@ def all_teams() -> Iterable[Category]:
         cat = ROLE_CATS[role]
         if cat in TEAMS and cat is not Hidden:
             yield cat
+
 
 def get_team(var: GameState, role: str) -> Category:
     if not FROZEN:
@@ -128,26 +171,27 @@ def get_team(var: GameState, role: str) -> Category:
     else:
         raise RuntimeError(f"No team defined for role {role}")
 
+
 def _register_roles(evt: Event):
     global FROZEN
-    team_evt = Event("get_role_metadata", {
-        "teams": {"Wolfteam", "Vampire Team", "Village", "Neutral", "Hidden"}
-    })
+    team_evt = Event(
+        "get_role_metadata", {"teams": {"Wolfteam", "Vampire Team", "Village", "Neutral", "Hidden"}}
+    )
     team_evt.dispatch(None, "team_categories")
     teams = set(team_evt.data["teams"])
     for cat in teams:
         if cat not in ROLE_CATS or ROLE_CATS[cat] is All or ROLE_CATS[cat] is Nobody:
-            raise ValueError("{0!r} is not a valid role category".format(cat))
+            raise ValueError(f"{cat!r} is not a valid role category")
 
     evt = Event("get_role_metadata", {})
     evt.dispatch(None, "role_categories")
     for role, cats in evt.data.items():
         if len(cats & teams) != 1:
-            raise RuntimeError("Invalid categories for {0}: Must have exactly one team defined".format(role))
+            raise RuntimeError(f"Invalid categories for {role}: Must have exactly one team defined")
         ROLES[role] = frozenset(cats)
         for cat in cats:
             if cat not in ROLE_CATS or ROLE_CATS[cat] is All or ROLE_CATS[cat] is Nobody:
-                raise ValueError("{0!r} is not a valid role category".format(cat))
+                raise ValueError(f"{cat!r} is not a valid role category")
             ROLE_CATS[cat].roles.add(role)
         All.roles.add(role)
 
@@ -158,7 +202,9 @@ def _register_roles(evt: Event):
     for cat in teams:
         TEAMS.add(ROLE_CATS[cat])
 
+
 EventListener(_register_roles, priority=1).install("init")
+
 
 class Category:
     """Base class for role categories."""
@@ -213,21 +259,21 @@ class Category:
     def __hash__(self):
         try:
             return hash(self._roles)
-        except TypeError: # still a regular set; not yet frozen
+        except TypeError:  # still a regular set; not yet frozen
             raise RuntimeError("Fatal: Role categories are not ready")
 
     def __str__(self):
         return self.name
 
     def __repr__(self):
-        return "Role category: {0}".format(self.name)
+        return f"Role category: {self.name}"
 
     def __invert__(self):
         new = self.from_combination(All, self, "", set.difference_update)
         if self.name in ROLE_CATS:
-            name = "~{0}".format(self.name)
+            name = f"~{self.name}"
         else:
-            name = "~({0})".format(self.name)
+            name = f"~({self.name})"
         new.name = name
         return new
 
@@ -239,8 +285,8 @@ class Category:
             for cont in (first, second):
                 for role in cont:
                     if role not in ROLES:
-                        raise ValueError("{0!r} is not a role".format(role))
-            name = "{0} {1} {2}".format(first, op, second)
+                        raise ValueError(f"{role!r} is not a role")
+            name = f"{first} {op} {second}"
             self = cls(name)
             self._roles.update(first)
             func(self._roles, second)
@@ -248,12 +294,21 @@ class Category:
             return self
         return NotImplemented
 
-    __add__ = __radd__  = lambda self, other: self.from_combination(self, other, "+", set.update)
-    __or__  = __ror__   = lambda self, other: self.from_combination(self, other, "|", set.update)
-    __and__ = __rand__  = lambda self, other: self.from_combination(self, other, "&", set.intersection_update)
-    __xor__ = __rxor__  = lambda self, other: self.from_combination(self, other, "^", set.symmetric_difference_update)
-    __sub__             = lambda self, other: self.from_combination(self, other, "-", set.difference_update)
-    __rsub__            = lambda self, other: self.from_combination(other, self, "-", set.difference_update)
+    __add__ = __radd__ = lambda self, other: self.from_combination(self, other, "+", set.update)
+    __or__ = __ror__ = lambda self, other: self.from_combination(self, other, "|", set.update)
+    __and__ = __rand__ = lambda self, other: self.from_combination(
+        self, other, "&", set.intersection_update
+    )
+    __xor__ = __rxor__ = lambda self, other: self.from_combination(
+        self, other, "^", set.symmetric_difference_update
+    )
+
+    def __sub__(self, other):
+        return self.from_combination(self, other, "-", set.difference_update)
+
+    def __rsub__(self, other):
+        return self.from_combination(other, self, "-", set.difference_update)
+
 
 # For proper auto-completion support in IDEs, please do not try to "save space" by turning this into a loop
 # and dynamically creating globals.

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
 
-from src.cats import Neutral, Evil
+from src.cats import Evil, Neutral
 from src.decorators import command
 from src.dispatcher import MessageDispatcher
 from src.events import Event, event_listener
@@ -11,11 +10,14 @@ from src.functions import get_main_role, get_target
 from src.gamestate import GameState
 from src.messages import messages
 from src.roles.helper.seers import setup_variables
-from src.status import try_misdirection, try_exchange
+from src.status import try_exchange, try_misdirection
 
 SEEN = setup_variables("augur")
 
-@command("see", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("augur",))
+
+@command(
+    "see", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("augur",)
+)
 def see(wrapper: MessageDispatcher, message: str):
     """Use your paranormal powers to determine the role or alignment of a player."""
     if wrapper.source in SEEN:
@@ -33,7 +35,6 @@ def see(wrapper: MessageDispatcher, message: str):
         return
 
     targrole = get_main_role(var, target)
-    trole = targrole # keep a copy for logging
 
     evt = Event("spy", {"role": targrole})
     evt.dispatch(var, wrapper.source, target, "augur")
@@ -50,8 +51,9 @@ def see(wrapper: MessageDispatcher, message: str):
 
     SEEN.add(wrapper.source)
 
+
 @event_listener("get_role_metadata")
-def on_get_role_metadata(evt: Event, var: Optional[GameState], kind: str):
+def on_get_role_metadata(evt: Event, var: GameState | None, kind: str):
     if kind == "role_categories":
         evt.data["augur"] = {"Village", "Nocturnal", "Spy", "Safe"}
     elif kind == "lycanthropy_role":

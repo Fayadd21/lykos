@@ -1,28 +1,52 @@
 from __future__ import annotations
 
-from collections import Counter, defaultdict
-from datetime import datetime, timedelta
-from typing import Optional, Callable, Union
 import threading
 import time
+from collections import Counter, defaultdict
+from collections.abc import Callable
+from datetime import datetime, timedelta
+from typing import Union
 
-from src.transport.irc import get_ircd
+from src import channels, config, db, locks, reaper, relay, users
+from src.cats import (
+    All,
+    Category,
+    Hidden,
+    Nobody,
+    Vampire_Objective,
+    Village_Objective,
+    Win_Stealer,
+    Wolf_Objective,
+    role_order,
+)
+from src.containers import UserDict, UserList, UserSet
 from src.decorators import command, handle_error
-from src.containers import UserSet, UserDict, UserList
-from src.functions import get_players, get_main_role, get_reveal_role
-from src.locations import Location, VillageSquare, get_players_in_location, move_player, move_player_home
-from src.warnings import expire_tempbans
-from src.messages import messages
-from src.status import is_silent, is_dying, try_protection, add_dying, kill_players, get_absent, try_lycanthropy
-from src.users import User
-from src.events import Event, event_listener
-from src.votes import chk_decision
-from src.cats import Win_Stealer, Wolf_Objective, Vampire_Objective, Village_Objective, role_order, get_team, All, \
-    Category, Nobody, Hidden
-from src import channels, users, locks, config, db, reaper, relay
 from src.dispatcher import MessageDispatcher
+from src.events import Event, event_listener
+from src.functions import get_main_role, get_players, get_reveal_role
 from src.gamestate import GameState, PregameState
+from src.locations import (
+    Location,
+    VillageSquare,
+    get_players_in_location,
+    move_player,
+    move_player_home,
+)
+from src.messages import messages
 from src.random import random
+from src.status import (
+    add_dying,
+    get_absent,
+    is_dying,
+    is_silent,
+    kill_players,
+    try_lycanthropy,
+    try_protection,
+)
+from src.transport.irc import get_ircd
+from src.users import User
+from src.votes import chk_decision
+from src.warnings import expire_tempbans
 
 # some type aliases to make things clearer later
 UserOrLocation = Union[User, Location]
@@ -33,16 +57,19 @@ TIMERS: dict[str, tuple[threading.Timer, float | int, int]] = {}
 
 DAY_ID: float | int = 0
 DAY_TIMEDELTA: timedelta = timedelta(0)
-DAY_START_TIME: Optional[datetime] = None
+DAY_START_TIME: datetime | None = None
 
 NIGHT_ID: float | int = 0
 NIGHT_TIMEDELTA: timedelta = timedelta(0)
-NIGHT_START_TIME: Optional[datetime] = None
+NIGHT_START_TIME: datetime | None = None
 
-ENDGAME_COMMAND: Optional[Callable] = None
-ADMIN_STOPPED = UserList() # this shouldn't hold more than one user at any point, but we need to keep track of it
+ENDGAME_COMMAND: Callable | None = None
+ADMIN_STOPPED = (
+    UserList()
+)  # this shouldn't hold more than one user at any point, but we need to keep track of it
 
 ORIGINAL_ACCOUNTS: UserDict[User, str] = UserDict()
+
 
 @handle_error
 def hurry_up(timer_type: str, var: GameState, phase_id: float, *, admin_forced: bool = False):
@@ -61,6 +88,7 @@ def hurry_up(timer_type: str, var: GameState, phase_id: float, *, admin_forced: 
     DAY_ID = 0
     chk_decision(var, timeout=True, admin_forced=admin_forced)
 
+
 @command("fnight", flag="N")
 def fnight(wrapper: MessageDispatcher, message: str):
     """Force the day to end and night to begin."""
@@ -68,6 +96,7 @@ def fnight(wrapper: MessageDispatcher, message: str):
         wrapper.pm(messages["not_daytime"])
     else:
         hurry_up("limit", wrapper.game_state, 0, admin_forced=True)
+
 
 @command("fday", flag="N")
 def fday(wrapper: MessageDispatcher, message: str):
@@ -77,12 +106,15 @@ def fday(wrapper: MessageDispatcher, message: str):
     else:
         transition_day(wrapper.game_state)
 
+
 def begin_day(var: GameState):
     global DAY_ID
     DAY_ID = time.time()
     pl = get_players(var)
 
-    if config.Main.get("timers.shortday.enabled") and len(pl) <= config.Main.get("timers.shortday.players"):
+    if config.Main.get("timers.shortday.enabled") and len(pl) <= config.Main.get(
+        "timers.shortday.players"
+    ):
         warn = var.short_day_time_warn
         limit = var.short_day_time_limit
     elif config.Main.get("timers.day.enabled"):
@@ -123,11 +155,14 @@ def begin_day(var: GameState):
     # induce a vote if we need to (due to lots of pacifism/impatience totems or whatever)
     chk_decision(var)
 
+
 def _night_warn(var: GameState):
     channels.Main.send(messages["twilight_warning"])
 
     # determine who hasn't acted yet and remind them to act
-    event = Event("chk_nightdone", {"acted": [], "nightroles": [], "transition_day": transition_day})
+    event = Event(
+        "chk_nightdone", {"acted": [], "nightroles": [], "transition_day": transition_day}
+    )
     event.dispatch(var)
 
     # remove all instances of them if they are silenced (makes implementing the event easier)
@@ -143,6 +178,7 @@ def _night_warn(var: GameState):
             player.queue_message(messages["night_idle_notice"])
     users.User.send_messages()
 
+
 @handle_error
 def night_timeout(timer_type: str, var: GameState, phase_id: int):
     if phase_id != NIGHT_ID or var.current_phase != "night" or var.in_phase_transition:
@@ -153,7 +189,9 @@ def night_timeout(timer_type: str, var: GameState, phase_id: int):
         return
 
     # determine which roles idled out night and give them warnings
-    event = Event("chk_nightdone", {"acted": [], "nightroles": [], "transition_day": transition_day})
+    event = Event(
+        "chk_nightdone", {"acted": [], "nightroles": [], "transition_day": transition_day}
+    )
     event.dispatch(var)
 
     # if night idle warnings are disabled, head straight to day
@@ -179,10 +217,12 @@ def night_timeout(timer_type: str, var: GameState, phase_id: int):
 
     event.data["transition_day"](var)
 
+
 @event_listener("night_idled")
 def on_night_idled(evt: Event, var: GameState, player):
     if player in NIGHT_IDLE_EXEMPT:
         evt.prevent_default = True
+
 
 @handle_error
 def transition_day(var: GameState, game_id: int = 0):
@@ -229,11 +269,9 @@ def transition_day(var: GameState, game_id: int = 0):
     novictmsg = True
     howl_count = 0
 
-    evt = Event("night_kills", {
-        "victims": victims,
-        "killers": killers,
-        "kill_priorities": kill_priorities
-        })
+    evt = Event(
+        "night_kills", {"victims": victims, "killers": killers, "kill_priorities": kill_priorities}
+    )
     evt.dispatch(var)
 
     # expand locations to encompass everyone at that location
@@ -252,7 +290,9 @@ def transition_day(var: GameState, game_id: int = 0):
             del killers[v]
 
     # sort the killers dict by kill priority, adding random jitter to break ties
-    get_kill_priority = lambda x: kill_priorities[x] + random.random()
+    def get_kill_priority(x):
+        return kill_priorities[x] + random.random()
+
     killers = {u: sorted(kl, key=get_kill_priority) for u, kl in killers.items()}
 
     # save a copy of roles so we can credit kills to the roles the players were at night,
@@ -268,7 +308,7 @@ def transition_day(var: GameState, game_id: int = 0):
                     "role": None,
                     "try_protection": True,
                     "protection_reason": "night_death",
-                    "try_lycanthropy": False
+                    "try_lycanthropy": False,
                 }
                 if killer == "@wolves":
                     kdata["role"] = "wolf"
@@ -282,7 +322,13 @@ def transition_day(var: GameState, game_id: int = 0):
                     kdata["role"] = get_main_role(var, killer, mainroles=mainroles)
                 protected = None
                 if kdata["try_protection"]:
-                    protected = try_protection(var, victim, kdata["attacker"], kdata["role"], reason=kdata["protection_reason"])
+                    protected = try_protection(
+                        var,
+                        victim,
+                        kdata["attacker"],
+                        kdata["role"],
+                        reason=kdata["protection_reason"],
+                    )
                 if protected is not None:
                     message[victim].extend(protected)
                     killers[victim].remove(killer)
@@ -301,10 +347,15 @@ def transition_day(var: GameState, game_id: int = 0):
 
     # Delay messaging until all protections and lycanthropy has been processed for every victim
     for victim in dead:
-        mevt = Event("night_death_message", {
-            "key": "death" if var.role_reveal in ("on", "team") else "death_no_reveal",
-            "args": [victim, get_reveal_role(var, victim)]
-        }, rolemap=rolemap, mainroles=mainroles)
+        mevt = Event(
+            "night_death_message",
+            {
+                "key": "death" if var.role_reveal in ("on", "team") else "death_no_reveal",
+                "args": [victim, get_reveal_role(var, victim)],
+            },
+            rolemap=rolemap,
+            mainroles=mainroles,
+        )
         if mevt.dispatch(var, victim, killers[victim][0]):
             message[victim].append(messages[mevt.data["key"]].format(*mevt.data["args"]))
 
@@ -312,11 +363,17 @@ def transition_day(var: GameState, game_id: int = 0):
     # The victims, dead, and killers collections should not be mutated in this event, use earlier events
     # to manipulate these (such as night_kills and by adding protections), or later events (del_player) in the case
     # of chained deaths.
-    evt = Event("transition_day_resolve", {
-        "message": message,
-        "novictmsg": novictmsg,
-        "howl": howl_count,
-        }, victims=victims, rolemap=rolemap, mainroles=mainroles)
+    evt = Event(
+        "transition_day_resolve",
+        {
+            "message": message,
+            "novictmsg": novictmsg,
+            "howl": howl_count,
+        },
+        victims=victims,
+        rolemap=rolemap,
+        mainroles=mainroles,
+    )
     evt.dispatch(var, dead, {v: k[0] for v, k in killers.items() if v in dead})
 
     # handle howls and novictmsg
@@ -342,7 +399,7 @@ def transition_day(var: GameState, game_id: int = 0):
             d = Counter(dict(rs))
             revt.data["new"] = [d]
             revt.dispatch(var, d, "howl")
-            for new_set in revt.data["new"]: # type: Counter[str]
+            for new_set in revt.data["new"]:  # type: Counter[str]
                 if min(new_set.values()) >= 0:
                     newstats.add(frozenset(new_set.items()))
         var.set_role_stats(newstats)
@@ -357,13 +414,16 @@ def transition_day(var: GameState, game_id: int = 0):
             killer = None
             killer_role[deadperson] = "wolf"
         elif isinstance(killer, str):
-            kevt = Event("resolve_killer_tag", {
-                "attacker": None,
-                "role": None,
-                "try_protection": True,
-                "protection_reason": "night_death",
-                "try_lycanthropy": False
-            })
+            kevt = Event(
+                "resolve_killer_tag",
+                {
+                    "attacker": None,
+                    "role": None,
+                    "try_protection": True,
+                    "protection_reason": "night_death",
+                    "try_lycanthropy": False,
+                },
+            )
             kevt.dispatch(var, deadperson, killer)
             assert kevt.data["role"] is not None
             killer = kevt.data["attacker"]
@@ -373,16 +433,19 @@ def transition_day(var: GameState, game_id: int = 0):
 
         add_dying(var, deadperson, killer_role[deadperson], "night_kill", killer=killer)
 
-    kill_players(var, end_game=False) # temporary hack; end_game=False also prevents kill_players from attempting phase transitions
+    kill_players(
+        var, end_game=False
+    )  # temporary hack; end_game=False also prevents kill_players from attempting phase transitions
 
     event_end = Event("transition_day_end", {"begin_day": begin_day})
     event_end.dispatch(var)
 
     # make sure that we process ALL of the transition_day events before checking for game end
-    if chk_win(var): # game ending
+    if chk_win(var):  # game ending
         return
 
     event_end.data["begin_day"](var)
+
 
 @handle_error
 def transition_night(var: GameState):
@@ -453,11 +516,14 @@ def transition_night(var: GameState):
     # If there are no nightroles that can act, immediately turn it to daytime
     chk_nightdone(var)
 
+
 def chk_nightdone(var: GameState):
     if var.current_phase != "night":
         return
 
-    event = Event("chk_nightdone", {"acted": [], "nightroles": [], "transition_day": transition_day})
+    event = Event(
+        "chk_nightdone", {"acted": [], "nightroles": [], "transition_day": transition_day}
+    )
     event.dispatch(var)
     actedcount = len(event.data["acted"])
 
@@ -467,11 +533,18 @@ def chk_nightdone(var: GameState):
     if var.current_phase == "night" and actedcount >= len(nightroles):
         event.data["transition_day"](var)
 
-def stop_game(var: Optional[GameState | PregameState], winner: Category = Nobody, abort=False, additional_winners=None, log=True):
+
+def stop_game(
+    var: GameState | PregameState | None,
+    winner: Category = Nobody,
+    abort=False,
+    additional_winners=None,
+    log=True,
+):
     global DAY_TIMEDELTA, NIGHT_TIMEDELTA, ENDGAME_COMMAND
     if abort:
         channels.Main.send(messages["role_attribution_failed"])
-    elif var is None: # game already ended
+    elif var is None:  # game already ended
         return
     if DAY_START_TIME:
         now = datetime.now()
@@ -498,9 +571,11 @@ def stop_game(var: Optional[GameState | PregameState], winner: Category = Nobody
 
         roles_msg = []
 
-        rolemap = var.original_roles # this returns a different dict than the underlying value, so it's fine to modify
+        rolemap = (
+            var.original_roles
+        )  # this returns a different dict than the underlying value, so it's fine to modify
         mainroles = var.original_main_roles
-        orig_main = {} # if get_final_role changes mainroles, we want to stash original main role
+        orig_main = {}  # if get_final_role changes mainroles, we want to stash original main role
 
         for player, role in mainroles.items():
             evt = Event("get_final_role", {"role": var.final_roles.get(player, role)})
@@ -541,7 +616,10 @@ def stop_game(var: Optional[GameState | PregameState], winner: Category = Nobody
         channels.Main.send(*roles_msg)
 
         # map player: all roles of that player (for below)
-        allroles = {player: frozenset({role for role, players in rolemap.items() if player in players}) for player in mainroles}
+        allroles = {
+            player: frozenset({role for role, players in rolemap.items() if player in players})
+            for player in mainroles
+        }
 
         # "" indicates everyone died or abnormal game stop
         winners = set()
@@ -573,16 +651,17 @@ def stop_game(var: Optional[GameState | PregameState], winner: Category = Nobody
             # Once *all* team wins are settled, we can determine individual wins and get the final list of winners
             team_wins = frozenset(team_wins)
             for player, role in mainroles.items():
-                entry = {"version": 4,
-                         "account": player.account,
-                         "main_role": role,
-                         "all_roles": list(allroles[player]),
-                         "special": [],
-                         "team_win": player in team_wins,
-                         "individual_win": False,
-                         "count_game": True,
-                         "dced": player in reaper.DCED_LOSERS
-                         }
+                entry = {
+                    "version": 4,
+                    "account": player.account,
+                    "main_role": role,
+                    "all_roles": list(allroles[player]),
+                    "special": [],
+                    "team_win": player in team_wins,
+                    "individual_win": False,
+                    "count_game": True,
+                    "dced": player in reaper.DCED_LOSERS,
+                }
                 # player.account could be None if they disconnected during the game. Use original tracked account name
                 if entry["account"] is None and player in ORIGINAL_ACCOUNTS:
                     entry["account"] = ORIGINAL_ACCOUNTS[player]
@@ -593,9 +672,15 @@ def stop_game(var: Optional[GameState | PregameState], winner: Category = Nobody
                     won = entry["team_win"] and survived
 
                     # let events modify this default and also add special tags/pseudo-roles to the stats
-                    event = Event("player_win", {"individual_win": won, "special": [], "count_game": True},
-                                  team_wins=team_wins, is_win_stealer=is_win_stealer)
-                    event.dispatch(var, player, role, allroles[player], winner, entry["team_win"], survived)
+                    event = Event(
+                        "player_win",
+                        {"individual_win": won, "special": [], "count_game": True},
+                        team_wins=team_wins,
+                        is_win_stealer=is_win_stealer,
+                    )
+                    event.dispatch(
+                        var, player, role, allroles[player], winner, entry["team_win"], survived
+                    )
                     won = event.data["individual_win"]
                     # count the game towards stats if the player_win event tells us to or if the player dced
                     # (so dc'ed players take a game stats penalty even if they're a role that normally doesn't count)
@@ -617,21 +702,30 @@ def stop_game(var: Optional[GameState | PregameState], winner: Category = Nobody
                     player_list.append(entry)
 
             from src.status.dying import DEAD
-            game_options = {"role reveal": var.role_reveal,
-                            "stats": var.stats_type,
-                            "abstain": "on" if var.abstain_enabled and not var.limit_abstain else "restricted" if var.abstain_enabled else "off",
-                            "roles": {}}
+
+            game_options = {
+                "role reveal": var.role_reveal,
+                "stats": var.stats_type,
+                "abstain": "on"
+                if var.abstain_enabled and not var.limit_abstain
+                else "restricted"
+                if var.abstain_enabled
+                else "off",
+                "roles": {},
+            }
             for role, pl in var.original_roles.items():
                 if len(pl) > 0:
                     game_options["roles"][role] = len(pl)
 
-            db.add_game(var.current_mode.name,
-                        len(get_players(var)) + len(DEAD),
-                        time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(var.game_id)),
-                        time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
-                        winner,
-                        player_list,
-                        game_options)
+            db.add_game(
+                var.current_mode.name,
+                len(get_players(var)) + len(DEAD),
+                time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(var.game_id)),
+                time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
+                winner,
+                player_list,
+                game_options,
+            )
 
             # spit out the list of winners
             if winners:
@@ -653,12 +747,13 @@ def stop_game(var: Optional[GameState | PregameState], winner: Category = Nobody
     if ENDGAME_COMMAND is not None:
         ENDGAME_COMMAND()
         ENDGAME_COMMAND = None
-    if ADMIN_STOPPED: # It was an flastgame
+    if ADMIN_STOPPED:  # It was an flastgame
         channels.Main.send(messages["fstop_ping"].format(ADMIN_STOPPED))
         ADMIN_STOPPED.clear()
 
+
 def chk_win(var: GameState, *, end_game=True, winner=None, count_absent=True):
-    """ Returns True if someone won """
+    """Returns True if someone won"""
     global ENDGAME_COMMAND
     lpl = len(get_players(var))
 
@@ -677,16 +772,19 @@ def chk_win(var: GameState, *, end_game=True, winner=None, count_absent=True):
             return True
         return False
     if var.setup_completed and not var.in_game:
-        return False # some other thread already ended game probably
+        return False  # some other thread already ended game probably
 
     return chk_win_conditions(var, var.roles, var.main_roles, end_game, winner, count_absent)
 
-def chk_win_conditions(var: GameState,
-                       rolemap: dict[str, set[User]] | UserDict[str, UserSet],
-                       mainroles: dict[User, str] | UserDict[User, str],
-                       end_game=True,
-                       winner=None,
-                       count_absent=True):
+
+def chk_win_conditions(
+    var: GameState,
+    rolemap: dict[str, set[User]] | UserDict[str, UserSet],
+    mainroles: dict[User, str] | UserDict[User, str],
+    end_game=True,
+    winner=None,
+    count_absent=True,
+):
     """Internal handler for the chk_win function."""
     with locks.reaper:
         if var.current_phase == "day" and count_absent:
@@ -722,7 +820,9 @@ def chk_win_conditions(var: GameState,
         #     (monster's message changes based on who would have otherwise won)
         # 5 = gamemode-specific win conditions
         event = Event("chk_win", {"winner": winner, "message": message, "additional_winners": None})
-        if not event.dispatch(var, rolemap, mainroles, lpl, num_wolves, num_real_wolves, num_vampires):
+        if not event.dispatch(
+            var, rolemap, mainroles, lpl, num_wolves, num_real_wolves, num_vampires
+        ):
             return chk_win_conditions(var, rolemap, mainroles, end_game, winner)
         winner = event.data["winner"]
         message = event.data["message"]
@@ -734,6 +834,7 @@ def chk_win_conditions(var: GameState,
             channels.Main.send(message)
             stop_game(var, winner, additional_winners=event.data["additional_winners"])
         return True
+
 
 @command("fstop", flag="S")
 def reset_game(wrapper: MessageDispatcher, message: str):
@@ -751,10 +852,11 @@ def reset_game(wrapper: MessageDispatcher, message: str):
     if pl:
         wrapper.send(messages["fstop_ping"].format(pl))
 
-def reset(var: Optional[GameState | PregameState]):
+
+def reset(var: GameState | PregameState | None):
     # Reset game timers
     if var is not None:
-        with locks.join_timer: # make sure it isn't being used by the ping join handler
+        with locks.join_timer:  # make sure it isn't being used by the ping join handler
             for timers in TIMERS.values():
                 timers[0].cancel()
             TIMERS.clear()
@@ -772,9 +874,12 @@ def reset(var: Optional[GameState | PregameState]):
             ircd = get_ircd()
             if ircd.supports_quiet():
                 from src.status.dying import DEAD
+
                 for deadguy in DEAD:
                     if not deadguy.is_fake:
-                        cmodes.append((f"-{ircd.quiet_mode}", f"{ircd.quiet_prefix}{deadguy.nick}!*@*"))
+                        cmodes.append(
+                            (f"-{ircd.quiet_mode}", f"{ircd.quiet_prefix}{deadguy.nick}!*@*")
+                        )
         channels.Main.mode("-m", *cmodes)
 
     evt = Event("reset", {})
@@ -785,9 +890,11 @@ def reset(var: Optional[GameState | PregameState]):
 
     channels.Main.game_state = None
 
+
 @event_listener("transition_night_begin")
 def on_transition_night_begin(evt: Event, var: GameState):
     NIGHT_IDLE_EXEMPT.clear()
+
 
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):

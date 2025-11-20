@@ -1,21 +1,20 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from src import status
 from src.cats import All
-from src.containers import UserSet, UserDict
+from src.containers import UserDict, UserSet
 from src.decorators import command
+from src.dispatcher import MessageDispatcher
 from src.events import Event, event_listener
 from src.functions import get_all_players, get_target
-from src.messages import messages
-from src.roles.helper.wolves import is_known_wolf_ally, register_wolf, send_wolfchat_message
-from src.status import try_misdirection, try_exchange
-from src.users import User
-from src.dispatcher import MessageDispatcher
 from src.gamestate import GameState
+from src.messages import messages
 from src.random import random
+from src.roles.helper.wolves import is_known_wolf_ally, register_wolf, send_wolfchat_message
+from src.status import try_exchange, try_misdirection
+from src.users import User
 
 register_wolf("doomsayer")
 
@@ -27,7 +26,10 @@ LYCANS: UserDict[User, User] = UserDict()
 
 _mappings = ("death", KILLS), ("lycan", LYCANS), ("sick", SICK)
 
-@command("see", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("doomsayer",))
+
+@command(
+    "see", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("doomsayer",)
+)
 def see(wrapper: MessageDispatcher, message: str):
     """Use your paranormal senses to determine a player's doom."""
     if wrapper.source in SEEN:
@@ -53,31 +55,44 @@ def see(wrapper: MessageDispatcher, message: str):
 
     mode, mapping = random.choice(_mappings)
     # keys: doomsayer_death, doomsayer_lycan, doomsayer_sick
-    wrapper.send(messages["doomsayer_{0}".format(mode)].format(target))
+    wrapper.send(messages[f"doomsayer_{mode}"].format(target))
     mapping[wrapper.source] = target
 
-    send_wolfchat_message(var, wrapper.source, messages["doomsayer_wolfchat"].format(wrapper.source, target), ("doomsayer",), role="doomsayer", command="see")
+    send_wolfchat_message(
+        var,
+        wrapper.source,
+        messages["doomsayer_wolfchat"].format(wrapper.source, target),
+        ("doomsayer",),
+        role="doomsayer",
+        command="see",
+    )
 
     SEEN.add(wrapper.source)
     LASTSEEN[wrapper.source] = target
 
+
 @event_listener("new_role")
-def on_new_role(evt: Event, var: GameState, player: User, old_role: Optional[str]):
+def on_new_role(evt: Event, var: GameState, player: User, old_role: str | None):
     if old_role == "doomsayer" and evt.data["role"] != "doomsayer":
         SEEN.discard(player)
         for name, mapping in _mappings:
             del mapping[:player:]
 
+
 @event_listener("del_player")
-def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool):
+def on_del_player(
+    evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool
+):
     # only remove from SEEN; keep results of sees intact on death
     # so that we can apply them in begin_day even if doomsayer dies.
     SEEN.discard(player)
+
 
 @event_listener("chk_nightdone")
 def on_chk_nightdone(evt: Event, var: GameState):
     evt.data["acted"].extend(SEEN)
     evt.data["nightroles"].extend(get_all_players(var, ("doomsayer",)))
+
 
 @event_listener("transition_day_begin")
 def on_transition_day_begin(evt: Event, var: GameState):
@@ -87,11 +102,13 @@ def on_transition_day_begin(evt: Event, var: GameState):
         status.add_silent(var, target)
     User.send_messages()
 
+
 @event_listener("night_kills")
 def on_night_kills(evt: Event, var: GameState):
     for killer, victim in list(KILLS.items()):
         evt.data["victims"].add(victim)
         evt.data["killers"][victim].append(killer)
+
 
 @event_listener("transition_night_end")
 def on_transition_night_end(evt: Event, var: GameState):
@@ -107,6 +124,7 @@ def on_transition_night_end(evt: Event, var: GameState):
     LYCANS.clear()
     SICK.clear()
 
+
 @event_listener("begin_day")
 def on_begin_day(evt: Event, var: GameState):
     # clear out LASTSEEN for people that didn't see last night
@@ -117,6 +135,7 @@ def on_begin_day(evt: Event, var: GameState):
     SEEN.clear()
     KILLS.clear()
 
+
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):
     SEEN.clear()
@@ -124,7 +143,17 @@ def on_reset(evt: Event, var: GameState):
     SICK.clear()
     LYCANS.clear()
 
+
 @event_listener("get_role_metadata")
-def on_get_role_metadata(evt: Event, var: Optional[GameState], kind: str):
+def on_get_role_metadata(evt: Event, var: GameState | None, kind: str):
     if kind == "role_categories":
-        evt.data["doomsayer"] = {"Wolf", "Wolfchat", "Wolfteam", "Killer", "Nocturnal", "Village Objective", "Wolf Objective", "Evil"}
+        evt.data["doomsayer"] = {
+            "Wolf",
+            "Wolfchat",
+            "Wolfteam",
+            "Killer",
+            "Nocturnal",
+            "Village Objective",
+            "Wolf Objective",
+            "Evil",
+        }

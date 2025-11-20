@@ -1,9 +1,9 @@
 # Generated from D:/Code/lykos/src/messages\message_lexer.g4 by ANTLR 4.8
-from antlr4 import *
+import sys
 from io import StringIO
 from typing.io import TextIO
-import sys
 
+from antlr4 import *
 
 
 def serializedATN():
@@ -29,19 +29,19 @@ def serializedATN():
         buf.write("\3\31\3\31\3\31\3\31\3\31\3\31\6\31\u00cb\n\31\r\31\16")
         buf.write("\31\u00cc\3\32\3\32\3\32\3\32\3\32\3\33\3\33\3\33\3\33")
         buf.write("\2\2\34\t\3\13\4\r\5\17\6\21\7\23\b\25\t\27\n\31\2\33")
-        buf.write("\2\35\13\37\f!\r#\2%\16\'\17)\2+\2-\20/\2\61\2\63\21\65")
+        buf.write("\2\35\13\37\f!\r#\2%\16'\17)\2+\2-\20/\2\61\2\63\21\65")
         buf.write("\2\67\229\2;\23\t\2\3\4\5\6\7\b\7\6\2]]__}}\177\177\4")
         buf.write("\2C\\c|\6\2##<<}}\177\177\6\2*+<<}}\177\177\5\2*+}}\177")
         buf.write("\177\2\u00df\2\t\3\2\2\2\2\13\3\2\2\2\2\r\3\2\2\2\3\17")
         buf.write("\3\2\2\2\3\21\3\2\2\2\3\23\3\2\2\2\3\25\3\2\2\2\4\27\3")
         buf.write("\2\2\2\4\31\3\2\2\2\4\33\3\2\2\2\5\35\3\2\2\2\5\37\3\2")
-        buf.write("\2\2\5!\3\2\2\2\5#\3\2\2\2\5%\3\2\2\2\6\'\3\2\2\2\6)\3")
+        buf.write("\2\2\5!\3\2\2\2\5#\3\2\2\2\5%\3\2\2\2\6'\3\2\2\2\6)\3")
         buf.write("\2\2\2\6+\3\2\2\2\7-\3\2\2\2\7/\3\2\2\2\7\61\3\2\2\2\7")
         buf.write("\63\3\2\2\2\7\65\3\2\2\2\b\67\3\2\2\2\b9\3\2\2\2\b;\3")
         buf.write("\2\2\2\tO\3\2\2\2\13S\3\2\2\2\rW\3\2\2\2\17\\\3\2\2\2")
         buf.write("\21`\3\2\2\2\23b\3\2\2\2\25f\3\2\2\2\27t\3\2\2\2\31x\3")
         buf.write("\2\2\2\33}\3\2\2\2\35\u0084\3\2\2\2\37\u0088\3\2\2\2!")
-        buf.write("\u008c\3\2\2\2#\u0090\3\2\2\2%\u0095\3\2\2\2\'\u009a\3")
+        buf.write("\u008c\3\2\2\2#\u0090\3\2\2\2%\u0095\3\2\2\2'\u009a\3")
         buf.write("\2\2\2)\u009e\3\2\2\2+\u00a3\3\2\2\2-\u00aa\3\2\2\2/\u00ae")
         buf.write("\3\2\2\2\61\u00b2\3\2\2\2\63\u00b7\3\2\2\2\65\u00bb\3")
         buf.write("\2\2\2\67\u00ca\3\2\2\29\u00ce\3\2\2\2;\u00d3\3\2\2\2")
@@ -65,7 +65,7 @@ def serializedATN():
         buf.write("\u0084\3\2\2\2\u0086\u0087\3\2\2\2\u0087\36\3\2\2\2\u0088")
         buf.write("\u0089\7#\2\2\u0089\u008a\3\2\2\2\u008a\u008b\b\r\21\2")
         buf.write("\u008b \3\2\2\2\u008c\u008d\7<\2\2\u008d\u008e\3\2\2\2")
-        buf.write("\u008e\u008f\b\16\22\2\u008f\"\3\2\2\2\u0090\u0091\7}")
+        buf.write('\u008e\u008f\b\16\22\2\u008f"\3\2\2\2\u0090\u0091\7}')
         buf.write("\2\2\u0091\u0092\3\2\2\2\u0092\u0093\b\17\b\2\u0093\u0094")
         buf.write("\b\17\16\2\u0094$\3\2\2\2\u0095\u0096\7\177\2\2\u0096")
         buf.write("\u0097\3\2\2\2\u0097\u0098\b\20\n\2\u0098&\3\2\2\2\u0099")
@@ -101,10 +101,9 @@ def serializedATN():
 
 
 class message_lexer(Lexer):
-
     atn = ATNDeserializer().deserialize(serializedATN())
 
-    decisionsToDFA = [ DFA(ds, i) for i, ds in enumerate(atn.decisionToState) ]
+    decisionsToDFA = [DFA(ds, i) for i, ds in enumerate(atn.decisionToState)]
 
     IN_TAG = 1
     IN_TAG_PARAM = 2
@@ -131,45 +130,89 @@ class message_lexer(Lexer):
     ARGLIST_VALUE = 16
     CLOSE_ARGLIST = 17
 
-    channelNames = [ u"DEFAULT_TOKEN_CHANNEL", u"HIDDEN" ]
+    channelNames = ["DEFAULT_TOKEN_CHANNEL", "HIDDEN"]
 
-    modeNames = [ "DEFAULT_MODE", "IN_TAG", "IN_TAG_PARAM", "IN_SUB", "IN_CONV", 
-                  "IN_SPEC", "IN_ARGLIST" ]
+    modeNames = [
+        "DEFAULT_MODE",
+        "IN_TAG",
+        "IN_TAG_PARAM",
+        "IN_SUB",
+        "IN_CONV",
+        "IN_SPEC",
+        "IN_ARGLIST",
+    ]
 
-    literalNames = [ "<INVALID>",
-            "'['", "'{'", "'/'", "'='", "'!'", "'('", "')'" ]
+    literalNames = ["<INVALID>", "'['", "'{'", "'/'", "'='", "'!'", "'('", "')'"]
 
-    symbolicNames = [ "<INVALID>",
-            "TEXT", "OPEN_TAG", "OPEN_SUB", "TAG_NAME", "TAG_SLASH", "TAG_SEP", 
-            "CLOSE_TAG", "TAG_PARAM", "SUB_FIELD", "SUB_CONVERT", "SUB_SPEC", 
-            "CLOSE_SUB", "SUB_IDENTIFIER", "SPEC_VALUE", "OPEN_ARGLIST", 
-            "ARGLIST_VALUE", "CLOSE_ARGLIST" ]
+    symbolicNames = [
+        "<INVALID>",
+        "TEXT",
+        "OPEN_TAG",
+        "OPEN_SUB",
+        "TAG_NAME",
+        "TAG_SLASH",
+        "TAG_SEP",
+        "CLOSE_TAG",
+        "TAG_PARAM",
+        "SUB_FIELD",
+        "SUB_CONVERT",
+        "SUB_SPEC",
+        "CLOSE_SUB",
+        "SUB_IDENTIFIER",
+        "SPEC_VALUE",
+        "OPEN_ARGLIST",
+        "ARGLIST_VALUE",
+        "CLOSE_ARGLIST",
+    ]
 
-    ruleNames = [ "TEXT", "OPEN_TAG", "OPEN_SUB", "TAG_NAME", "TAG_SLASH", 
-                  "TAG_SEP", "CLOSE_TAG", "TAG_PARAM", "TAG_OPEN_SUB", "TAG_PARAM_CLOSE", 
-                  "SUB_FIELD", "SUB_CONVERT", "SUB_SPEC", "SUB_OPEN_SUB", 
-                  "CLOSE_SUB", "SUB_IDENTIFIER", "CONV_SPEC", "CLOSE_CONV", 
-                  "SPEC_VALUE", "SPEC_SEP", "SPEC_OPEN_SUB", "OPEN_ARGLIST", 
-                  "CLOSE_SPEC", "ARGLIST_VALUE", "ARGLIST_OPEN_SUB", "CLOSE_ARGLIST" ]
+    ruleNames = [
+        "TEXT",
+        "OPEN_TAG",
+        "OPEN_SUB",
+        "TAG_NAME",
+        "TAG_SLASH",
+        "TAG_SEP",
+        "CLOSE_TAG",
+        "TAG_PARAM",
+        "TAG_OPEN_SUB",
+        "TAG_PARAM_CLOSE",
+        "SUB_FIELD",
+        "SUB_CONVERT",
+        "SUB_SPEC",
+        "SUB_OPEN_SUB",
+        "CLOSE_SUB",
+        "SUB_IDENTIFIER",
+        "CONV_SPEC",
+        "CLOSE_CONV",
+        "SPEC_VALUE",
+        "SPEC_SEP",
+        "SPEC_OPEN_SUB",
+        "OPEN_ARGLIST",
+        "CLOSE_SPEC",
+        "ARGLIST_VALUE",
+        "ARGLIST_OPEN_SUB",
+        "CLOSE_ARGLIST",
+    ]
 
     grammarFileName = "message_lexer.g4"
 
-    def __init__(self, input=None, output:TextIO = sys.stdout):
+    def __init__(self, input=None, output: TextIO = sys.stdout):
         super().__init__(input, output)
         self.checkVersion("4.8")
-        self._interp = LexerATNSimulator(self, self.atn, self.decisionsToDFA, PredictionContextCache())
+        self._interp = LexerATNSimulator(
+            self, self.atn, self.decisionsToDFA, PredictionContextCache()
+        )
         self._actions = None
         self._predicates = None
 
-
-    def action(self, localctx:RuleContext, ruleIndex:int, actionIndex:int):
+    def action(self, localctx: RuleContext, ruleIndex: int, actionIndex: int):
         if self._actions is None:
             actions = dict()
-            actions[0] = self.TEXT_action 
-            actions[7] = self.TAG_PARAM_action 
-            actions[10] = self.SUB_FIELD_action 
-            actions[18] = self.SPEC_VALUE_action 
-            actions[23] = self.ARGLIST_VALUE_action 
+            actions[0] = self.TEXT_action
+            actions[7] = self.TAG_PARAM_action
+            actions[10] = self.SUB_FIELD_action
+            actions[18] = self.SPEC_VALUE_action
+            actions[23] = self.ARGLIST_VALUE_action
             self._actions = actions
         action = self._actions.get(ruleIndex, None)
         if action is not None:
@@ -177,62 +220,46 @@ class message_lexer(Lexer):
         else:
             raise Exception("No registered action for:" + str(ruleIndex))
 
-
-    def TEXT_action(self, localctx:RuleContext , actionIndex:int):
+    def TEXT_action(self, localctx: RuleContext, actionIndex: int):
         if actionIndex == 0:
-             self.append_text() 
-     
+            self.append_text()
 
         if actionIndex == 1:
-             self.append_text("{") 
-     
+            self.append_text("{")
 
         if actionIndex == 2:
-             self.append_text("}") 
-     
+            self.append_text("}")
 
         if actionIndex == 3:
-             self.append_text("[") 
-     
+            self.append_text("[")
 
         if actionIndex == 4:
-             self.append_text("]") 
-     
+            self.append_text("]")
 
-    def TAG_PARAM_action(self, localctx:RuleContext , actionIndex:int):
+    def TAG_PARAM_action(self, localctx: RuleContext, actionIndex: int):
         if actionIndex == 5:
-             self.append_text() 
-     
+            self.append_text()
 
         if actionIndex == 6:
-             self.append_text("{") 
-     
+            self.append_text("{")
 
         if actionIndex == 7:
-             self.append_text("}") 
-     
+            self.append_text("}")
 
-    def SUB_FIELD_action(self, localctx:RuleContext , actionIndex:int):
+    def SUB_FIELD_action(self, localctx: RuleContext, actionIndex: int):
         if actionIndex == 8:
-             self.append_text() 
-     
+            self.append_text()
 
-    def SPEC_VALUE_action(self, localctx:RuleContext , actionIndex:int):
+    def SPEC_VALUE_action(self, localctx: RuleContext, actionIndex: int):
         if actionIndex == 9:
-             self.append_text() 
-     
+            self.append_text()
 
-    def ARGLIST_VALUE_action(self, localctx:RuleContext , actionIndex:int):
+    def ARGLIST_VALUE_action(self, localctx: RuleContext, actionIndex: int):
         if actionIndex == 10:
-             self.append_text() 
-     
+            self.append_text()
 
         if actionIndex == 11:
-             self.append_text("{") 
-     
+            self.append_text("{")
 
         if actionIndex == 12:
-             self.append_text("}") 
-     
-
-
+            self.append_text("}")

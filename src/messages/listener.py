@@ -1,8 +1,8 @@
 from antlr4 import TerminalNode
-from typing import Optional
 
-from src.messages.message_parserListener import message_parserListener
 from src.messages.message_parser import message_parser
+from src.messages.message_parserListener import message_parserListener
+
 
 class Listener(message_parserListener):
     def __init__(self, message, args, kwargs):
@@ -16,7 +16,7 @@ class Listener(message_parserListener):
 
     def value(self):
         if self._value is None:
-            raise ValueError("Parse error: {}: Unexpected end of message".format(self.message.key))
+            raise ValueError(f"Parse error: {self.message.key}: Unexpected end of message")
         return self._value
 
     def _join_fragments(self, fragments, *, enforce_string=False):
@@ -61,14 +61,15 @@ class Listener(message_parserListener):
 
         if tag_name != close_name:
             # mismatch of tag names
-            raise ValueError("Parse error: {}: Opening tag {} ({}) does not match closing tag {} ({})".format(
-                             self.message.key, tag_name, ctx.open_tag().OPEN_TAG().getSymbol().column,
-                             close_name, ctx.close_tag().CLOSE_TAG().getSymbol().column))
+            raise ValueError(
+                f"Parse error: {self.message.key}: Opening tag {tag_name} ({ctx.open_tag().OPEN_TAG().getSymbol().column}) does not match closing tag {close_name} ({ctx.close_tag().CLOSE_TAG().getSymbol().column})"
+            )
 
         tag_func = getattr(self.message.formatter, "tag_" + tag_name, None)
         if not tag_func or not callable(tag_func):
-            raise ValueError("Parse error: {}: Unknown tag {} ({})".format(
-                             self.message.key, tag_name, ctx.open_tag().OPEN_TAG().getSymbol().column))
+            raise ValueError(
+                f"Parse error: {self.message.key}: Unknown tag {tag_name} ({ctx.open_tag().OPEN_TAG().getSymbol().column})"
+            )
 
         ctx.value = tag_func(content, param)
 
@@ -93,7 +94,7 @@ class Listener(message_parserListener):
 
         field_name = ctx.sub_field().value
         convert = self._coalesce(ctx.sub_convert())
-        spec: Optional[dict] = dict(x.value for x in ctx.sub_spec())
+        spec: dict | None = dict(x.value for x in ctx.sub_spec())
         # if spec is empty, change it to None. Makes us more consistent with built in format method
         # (since formatter can be used for both this parse tree as well as normal formatting)
         if not spec:

@@ -1,28 +1,55 @@
 from __future__ import annotations
 
 import copy
-from pathlib import Path
 import os
 import sys
-from typing import Optional, Any
+from pathlib import Path
+from typing import Any
+
 from ruamel.yaml import YAML
 
 __all__ = ["Main", "Config", "Empty", "merge", "init"]
 
+
 # Empty is meant to be used as a singleton, so EmptyType is *not* in __all__
 class EmptyType:
+    """Used to mark when a config value hasn't been set yet.
+
+    This is basically a placeholder. When you copy it, it just returns itself
+    because there's only supposed to be one Empty value.
+    """
+
     def __copy__(self):
         return self
 
     def __deepcopy__(self, memo):
         return self
 
+
 Empty = EmptyType()
 
+
 class InvalidConfigValue(ValueError):
+    """Raised when someone tries to set a config value that's not allowed.
+
+    Like if you try to set a number where a string should be, or something
+    like that. The config system will throw this error.
+    """
+
     pass
 
+
 def init():
+    """Sets up the config system when the bot starts.
+
+    This loads all the config files in order:
+    1. First the default settings
+    2. Then your botconfig.yml if you have one
+    3. Then any config from the BOTCONFIG env variable
+    4. And if DEBUG is set, it turns on debug mode and loads debug config
+
+    You don't usually call this yourself, it gets called automatically.
+    """
     bp = Path(__file__).parent
     Main.load_metadata(bp / "defaultsettings.yml")
 
@@ -42,15 +69,22 @@ def init():
         logs = Main.get("logging.logs")
         for i, log in enumerate(logs):
             if log["group"] == "main":
-                Main.set("logging.logs[{}].level".format(i), "debug")
+                Main.set(f"logging.logs[{i}].level", "debug")
         dp = bp.parent / "botconfig.debug.yml"
         if dp.is_file():
             Main.load_config(dp)
 
+
 class Config:
+    """Holds all the bot's configuration settings.
+
+    You can load config files, get values, and set values with this class.
+    It makes sure everything matches the right types and stuff.
+    """
+
     def __init__(self):
-        self._metadata: Optional[dict[str, Any]] = None
-        self._metadata_file: Optional[str | Path] = None
+        self._metadata: dict[str, Any] | None = None
+        self._metadata_file: str | Path | None = None
         self._settings: Any = Empty
         self._files: list[str | Path] = []
 
@@ -63,14 +97,14 @@ class Config:
         assert self._metadata is None
         self._metadata_file = file
         y = YAML()
-        with open(file, "rt") as f:
+        with open(file) as f:
             self._metadata = y.load(f)
         # load default settings
         self._settings = merge(self._metadata, Empty, Empty, "<root>")
 
     def load_config(self, file: str | Path) -> None:
         """Load configuration file into the current Config instance.
-        
+
         :param file: Path to configuration file to load
         :raises RuntimeError: If the configuration file has already been loaded
         :raises AssertionError: If metadata has not yet been loaded
@@ -78,7 +112,9 @@ class Config:
         """
         assert self._metadata is not None
         if file in self._files:
-            raise RuntimeError("the specified configuration file has already been loaded for this Config instance")
+            raise RuntimeError(
+                "the specified configuration file has already been loaded for this Config instance"
+            )
 
         self._files.append(file)
         y = YAML()
@@ -88,9 +124,9 @@ class Config:
 
     def reload(self, refresh_metadata=False):
         """Reload configuration files to pick up any changes.
-        
+
         If the new configuration would error, the configuration is unmodified.
-        
+
         :param refresh_metadata: If True, reload the metadata file.
             If False, keep the current set of metadata.
         :raises TypeError: If any of the configuration files are invalid
@@ -118,25 +154,25 @@ class Config:
         for part in parts:
             if "[" in part:
                 key_part, idx_part_str = part.split("[", maxsplit=1)
-                idx_part: Optional[int] = int(idx_part_str[:-1])  # strip trailing "]"
+                idx_part: int | None = int(idx_part_str[:-1])  # strip trailing "]"
             else:
                 key_part = part
                 idx_part = None
             if key_part not in cur:
-                raise KeyError("configuration key not found: {}".format(key))
+                raise KeyError(f"configuration key not found: {key}")
             cur = cur[key_part]
             if key_part not in meta["_default"]:
                 if meta.get("_extra", False):
                     meta = {"_extra": True, "_type": "dict", "_default": {}}
                 else:
-                    raise KeyError("configuration key not found: {}".format(key))
+                    raise KeyError(f"configuration key not found: {key}")
             else:
                 meta = meta["_default"][key_part]
 
             meta_type = meta["_type"]
             if idx_part is not None:
                 if idx_part >= len(cur):
-                    raise KeyError("configuration key not found: {}".format(key))
+                    raise KeyError(f"configuration key not found: {key}")
                 cur = cur[idx_part]
                 meta = meta["_items"]
                 meta_type = meta["_type"]
@@ -160,14 +196,17 @@ class Config:
                     meta_type = meta["_type"]
             if meta_type == "tagged":
                 new_meta = copy.deepcopy(meta["_tags"][cur["type"]])
-                new_meta["_default"]["type"] = {"_type": "enum", "_values": list(meta["_tags"].keys())}
+                new_meta["_default"]["type"] = {
+                    "_type": "enum",
+                    "_values": list(meta["_tags"].keys()),
+                }
                 meta = new_meta
 
         return cur, meta
 
     def get(self, key: str, default=Empty):
         """Get the value of a configuration item.
-        
+
         In general, values retrieved should not be cached,
         but can be passed into other functions for dependency injection.
         Caching values can lead to inconsistencies in the event the configuration
@@ -175,7 +214,7 @@ class Config:
 
         A copy of the value is returned, so it is safe for the caller to mutate without
         impacting any other call sites.
-        
+
         :param key: Configuration key to load, using dots to separate object
             keys and index syntax to retrieve particular elements of lists.
             Ex: foo.bar[0].baz
@@ -200,7 +239,7 @@ class Config:
         # about causing issues with other call sites that need the setting
         return copy.deepcopy(cur)
 
-    def set(self, key: str, value, merge_strategy: Optional[str] = None) -> None:
+    def set(self, key: str, value, merge_strategy: str | None = None) -> None:
         """Modify a single config key.
 
         These changes are not persistent and will be lost if the configuration
@@ -226,7 +265,7 @@ class Config:
             set_value = i == len(parts) - 1
             if "[" in part:
                 key_part, idx_part_str = part.split("[", maxsplit=1)
-                idx_part: Optional[int] = int(idx_part_str[:-1])  # strip trailing "]"
+                idx_part: int | None = int(idx_part_str[:-1])  # strip trailing "]"
             else:
                 key_part = part
                 idx_part = None
@@ -247,11 +286,17 @@ class Config:
 
 Main = Config()
 
-def merge(metadata: dict[str, Any], base, settings, *path: str,
-          type_override: Optional[str] = None,
-          strategy_override: Optional[str] = None,
-          tagged: bool = False,
-          base_metadata: Optional[dict[str, Any]] = None) -> Any:
+
+def merge(
+    metadata: dict[str, Any],
+    base,
+    settings,
+    *path: str,
+    type_override: str | None = None,
+    strategy_override: str | None = None,
+    tagged: bool = False,
+    base_metadata: dict[str, Any] | None = None,
+) -> Any:
     """Merge settings into a base settings object.
 
     This calls itself recursively and does not mutate any passed-in objects.
@@ -294,13 +339,17 @@ def merge(metadata: dict[str, Any], base, settings, *path: str,
 
     ctors = metadata.get("_ctors", [])
     if ctors:
-        assert settings_type == "dict" and "_default" in metadata, f"Path {path} defines a constructor but is not a dict with a default"
+        assert (
+            settings_type == "dict" and "_default" in metadata
+        ), f"Path {path} defines a constructor but is not a dict with a default"
     if ctors and not isinstance(settings, dict):
         for ctor in ctors:
             # if a constructor fits our current data type, we'll merge that
             # into the default object and return it
             set_metadata = metadata["_default"][ctor["_set"]]
-            assert ctor["_type"] == set_metadata["_type"], f"Path {path} constructor type doesn't match the type of value it is setting"
+            assert (
+                ctor["_type"] == set_metadata["_type"]
+            ), f"Path {path} constructor type doesn't match the type of value it is setting"
             try:
                 value = {ctor["_set"]: merge(set_metadata, Empty, settings, *path, ctor["_set"])}
                 return merge(metadata, base, value, *path, strategy_override="replace")
@@ -309,7 +358,11 @@ def merge(metadata: dict[str, Any], base, settings, *path: str,
 
     if settings_type == "str":
         if settings is not Empty and not isinstance(settings, str):
-            raise TypeError("Expected type str for path '{}', got {} instead".format(".".join(path), type(settings)))
+            raise TypeError(
+                "Expected type str for path '{}', got {} instead".format(
+                    ".".join(path), type(settings)
+                )
+            )
         # str only supports one merge type: replace
         if merge_type is None:
             merge_type = "replace"
@@ -327,7 +380,11 @@ def merge(metadata: dict[str, Any], base, settings, *path: str,
     elif settings_type == "int":
         # bool is a subclass of int, so needs special handling
         if settings is not Empty and (not isinstance(settings, int) or isinstance(settings, bool)):
-            raise TypeError("Expected type int for path '{}', got {} instead".format(".".join(path), type(settings)))
+            raise TypeError(
+                "Expected type int for path '{}', got {} instead".format(
+                    ".".join(path), type(settings)
+                )
+            )
         # int supports three merge types: replace (default), max, min
         if merge_type is None:
             merge_type = "replace"
@@ -360,7 +417,11 @@ def merge(metadata: dict[str, Any], base, settings, *path: str,
 
     elif settings_type == "bool":
         if settings is not Empty and not isinstance(settings, bool):
-            raise TypeError("Expected type bool for path '{}', got {} instead".format(".".join(path), type(settings)))
+            raise TypeError(
+                "Expected type bool for path '{}', got {} instead".format(
+                    ".".join(path), type(settings)
+                )
+            )
         # bool supports three merge types: replace (default), and, or
         if merge_type is None:
             merge_type = "replace"
@@ -394,7 +455,11 @@ def merge(metadata: dict[str, Any], base, settings, *path: str,
     elif settings_type == "float":
         # Treat literal ints as floats too for ease of writing settings
         if settings is not Empty and not isinstance(settings, float) and type(settings) is not int:
-            raise TypeError("Expected type float for path '{}', got {} instead".format(".".join(path), type(settings)))
+            raise TypeError(
+                "Expected type float for path '{}', got {} instead".format(
+                    ".".join(path), type(settings)
+                )
+            )
         # float supports three merge types: replace (default), max, min
         if merge_type is None:
             merge_type = "replace"
@@ -429,11 +494,17 @@ def merge(metadata: dict[str, Any], base, settings, *path: str,
 
     elif settings_type == "enum":
         if settings is not Empty and not isinstance(settings, str):
-            raise TypeError("Expected type str for path '{}', got {} instead".format(".".join(path), type(settings)))
+            raise TypeError(
+                "Expected type str for path '{}', got {} instead".format(
+                    ".".join(path), type(settings)
+                )
+            )
         # need to know valid enum values
         assert "_values" in metadata
         if settings is not Empty and settings not in metadata["_values"]:
-            raise TypeError("Enum value {} for path '{}' is not valid".format(settings, ".".join(path)))
+            raise TypeError(
+                "Enum value {} for path '{}' is not valid".format(settings, ".".join(path))
+            )
         # enum supports one merge type: replace
         if merge_type is None:
             merge_type = "replace"
@@ -450,7 +521,11 @@ def merge(metadata: dict[str, Any], base, settings, *path: str,
 
     elif settings_type == "list":
         if settings is not Empty and not isinstance(settings, list):
-            raise TypeError("Expected type list for path '{}', got {} instead".format(".".join(path), type(settings)))
+            raise TypeError(
+                "Expected type list for path '{}', got {} instead".format(
+                    ".".join(path), type(settings)
+                )
+            )
         # need to know what type of items we can have in the list
         assert "_items" in metadata
 
@@ -462,21 +537,21 @@ def merge(metadata: dict[str, Any], base, settings, *path: str,
         if settings is not Empty:
             for i, item in enumerate(settings):
                 munged = list(path[:-1])
-                munged.append("{}[{}]".format(path[-1], i))
+                munged.append(f"{path[-1]}[{i}]")
                 settings_values.append(merge(metadata["_items"], Empty, item, *munged))
 
         base_values = []
         if isinstance(base, list):
             for i, item in enumerate(base):
                 munged = list(path)
-                munged.append("<base>[{}]".format(i))
+                munged.append(f"<base>[{i}]")
                 base_values.append(merge(metadata["_items"], Empty, item, *munged))
 
         default_values = []
         if isinstance(metadata["_default"], list):
             for i, item in enumerate(metadata["_default"]):
                 munged = list(path)
-                munged.append("<default>[{}]".format(i))
+                munged.append(f"<default>[{i}]")
                 default_values.append(merge(metadata["_items"], Empty, item, *munged))
 
         # list supports two merge types: append (default), replace
@@ -508,7 +583,11 @@ def merge(metadata: dict[str, Any], base, settings, *path: str,
 
     elif settings_type == "dict":
         if settings is not Empty and not isinstance(settings, dict):
-            raise TypeError("Expected type dict for path '{}', got {} instead".format(".".join(path), type(settings)))
+            raise TypeError(
+                "Expected type dict for path '{}', got {} instead".format(
+                    ".".join(path), type(settings)
+                )
+            )
         # need to know what keys are valid in the dict
         assert "_default" in metadata and isinstance(metadata["_default"], dict)
 
@@ -524,7 +603,9 @@ def merge(metadata: dict[str, Any], base, settings, *path: str,
             if tagged and "type" in extra:
                 extra.remove("type")
         if extra and not metadata.get("_extra", False):
-            raise TypeError("Value on path '{}' has unrecognized key {}".format(".".join(path), extra[0]))
+            raise TypeError(
+                "Value on path '{}' has unrecognized key {}".format(".".join(path), extra[0])
+            )
 
         # dict supports two merge types: merge (default), replace
         if merge_type is None:
@@ -556,7 +637,11 @@ def merge(metadata: dict[str, Any], base, settings, *path: str,
     elif settings_type == "tagged":
         # dict with a type key that indicates the type of dict
         if settings is not Empty and not isinstance(settings, dict):
-            raise TypeError("Expected type dict for path '{}', got {} instead".format(".".join(path), type(settings)))
+            raise TypeError(
+                "Expected type dict for path '{}', got {} instead".format(
+                    ".".join(path), type(settings)
+                )
+            )
         assert "_tags" in metadata
         # non-nullable tagged types don't have a default; nullable default already handled above
         if settings is Empty and base is Empty:
@@ -565,18 +650,33 @@ def merge(metadata: dict[str, Any], base, settings, *path: str,
             return base
 
         if "type" not in settings:
-            raise TypeError("Value on path '{}' is missing required key type".format(".".join(path)))
+            raise TypeError(
+                "Value on path '{}' is missing required key type".format(".".join(path))
+            )
 
         base_tag_metadata = None
         if base is not Empty:
             if base["type"] not in metadata["_tags"]:
-                raise TypeError("Value on path '{}' has unrecognized type {}".format(".".join(path), base["type"]))
+                raise TypeError(
+                    "Value on path '{}' has unrecognized type {}".format(
+                        ".".join(path), base["type"]
+                    )
+                )
             base_tag_metadata = metadata["_tags"][base["type"]]
 
         tagged_type = settings["type"]
         if tagged_type not in metadata["_tags"]:
-            raise TypeError("Value on path '{}' has unrecognized type {}".format(".".join(path), tagged_type))
-        return merge(metadata["_tags"][tagged_type], base, settings, *path, tagged=True, base_metadata=base_tag_metadata)
+            raise TypeError(
+                "Value on path '{}' has unrecognized type {}".format(".".join(path), tagged_type)
+            )
+        return merge(
+            metadata["_tags"][tagged_type],
+            base,
+            settings,
+            *path,
+            tagged=True,
+            base_metadata=base_tag_metadata,
+        )
 
     elif isinstance(settings_type, dict):
         # complex type
@@ -593,8 +693,12 @@ def merge(metadata: dict[str, Any], base, settings, *path: str,
                 e2.__cause__ = e1
                 e1 = e2
         else:
-            raise TypeError(("None of the candidate types for path '{}' matched actual type {}.".format(".".join(path), type(settings))
-                             + " See inner exceptions for more details on each candidate tried.")) from e1
+            raise TypeError(
+                "None of the candidate types for path '{}' matched actual type {}.".format(
+                    ".".join(path), type(settings)
+                )
+                + " See inner exceptions for more details on each candidate tried."
+            ) from e1
 
     else:
-        assert False, "Unknown settings type {}".format(settings_type)
+        assert False, f"Unknown settings type {settings_type}"

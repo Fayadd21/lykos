@@ -1,21 +1,20 @@
 from __future__ import annotations
 
 import re
-from typing import Optional, Union
 
 from src import users
 from src.cats import Category
-from src.containers import UserSet, UserDict
+from src.containers import UserDict, UserSet
 from src.decorators import command
 from src.dispatcher import MessageDispatcher
 from src.events import Event, event_listener
-from src.functions import get_players, get_all_players, get_target
+from src.functions import get_all_players, get_players, get_target
 from src.gamestate import GameState
+from src.locations import get_home, move_player
 from src.messages import messages
-from src.status import try_misdirection, try_exchange, is_dead
-from src.users import User
-from src.locations import move_player, get_home
 from src.random import random
+from src.status import is_dead, try_exchange, try_misdirection
+from src.users import User
 
 ENTRANCED = UserSet()
 VISITED: UserDict[users.User, users.User] = UserDict()
@@ -25,7 +24,16 @@ ALL_SUCC_IDLE = True
 
 Succubi = Category("Succubi")
 
-@command("visit", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("succubus",))
+
+@command(
+    "visit",
+    chan=False,
+    pm=True,
+    playing=True,
+    silenced=True,
+    phases=("night",),
+    roles=("succubus",),
+)
 def hvisit(wrapper: MessageDispatcher, message: str):
     """Entrance a player, converting them to your team."""
     if VISITED.get(wrapper.source):
@@ -64,7 +72,10 @@ def hvisit(wrapper: MessageDispatcher, message: str):
         revt = Event("visit", {})
         revt.dispatch(var, "succubus", wrapper.source, target)
 
-@command("pass", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("succubus",))
+
+@command(
+    "pass", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("succubus",)
+)
 def pass_cmd(wrapper: MessageDispatcher, message: str):
     """Do not entrance someone tonight."""
     if VISITED.get(wrapper.source):
@@ -73,6 +84,7 @@ def pass_cmd(wrapper: MessageDispatcher, message: str):
 
     PASSED.add(wrapper.source)
     wrapper.send(messages["succubus_pass"])
+
 
 @event_listener("visit")
 def on_visit(evt: Event, var: GameState, visitor_role: str, visitor: User, visited: User):
@@ -89,21 +101,44 @@ def on_visit(evt: Event, var: GameState, visitor_role: str, visitor: User, visit
             visited.send(messages["succubus_harlot_success"].format(visitor))
             ENTRANCED.add(visitor)
 
+
 # entranced logic should run after team wins have already been determined (aka run last)
 @event_listener("team_win", priority=7)
-def on_team_win(evt: Event, var: GameState, player: User, main_role: str, all_roles: set[str], winner: Category):
+def on_team_win(
+    evt: Event, var: GameState, player: User, main_role: str, all_roles: set[str], winner: Category
+):
     if player in ENTRANCED and winner is not Succubi:
         evt.data["team_win"] = False
 
+
 @event_listener("player_win")
-def on_player_win(evt: Event, var: GameState, player: User, main_role: str, all_roles: set[str], winner: Category, team_win: bool, survived: bool):
+def on_player_win(
+    evt: Event,
+    var: GameState,
+    player: User,
+    main_role: str,
+    all_roles: set[str],
+    winner: Category,
+    team_win: bool,
+    survived: bool,
+):
     if player in ENTRANCED:
         evt.data["special"].append("entranced")
         if winner is Succubi:
             evt.data["individual_win"] = True
 
+
 @event_listener("chk_win", priority=2)
-def on_chk_win(evt: Event, var: GameState, rolemap: dict[str, set[User]], mainroles: dict[User, str], lpl: int, lwolves: int, lrealwolves: int, lvampires: int):
+def on_chk_win(
+    evt: Event,
+    var: GameState,
+    rolemap: dict[str, set[User]],
+    mainroles: dict[User, str],
+    lpl: int,
+    lwolves: int,
+    lrealwolves: int,
+    lvampires: int,
+):
     lsuccubi = len(rolemap.get("succubus", ()))
     lentranced = len([x for x in ENTRANCED if not is_dead(var, x)])
     if var.current_phase == "day" and lsuccubi and lpl - lsuccubi == lentranced:
@@ -113,8 +148,9 @@ def on_chk_win(evt: Event, var: GameState, rolemap: dict[str, set[User]], mainro
         evt.data["winner"] = Succubi
         evt.data["message"] = messages["entranced_win"]
 
+
 @event_listener("new_role")
-def on_new_role(evt: Event, var: GameState, player: User, old_role: Optional[str]):
+def on_new_role(evt: Event, var: GameState, player: User, old_role: str | None):
     if old_role == "succubus" and evt.data["role"] != "succubus":
         del VISITED[:player:]
         PASSED.discard(player)
@@ -124,8 +160,11 @@ def on_new_role(evt: Event, var: GameState, player: User, old_role: Optional[str
         ENTRANCED.remove(player)
         player.send(messages["no_longer_entranced"])
 
+
 @event_listener("del_player")
-def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool):
+def on_del_player(
+    evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool
+):
     global ALL_SUCC_IDLE
     if "succubus" not in all_roles:
         return
@@ -149,16 +188,21 @@ def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str],
             e = ENTRANCED.pop()
             e.send(messages["entranced_revert_win"])
 
+
 @event_listener("night_death_message")
-def on_night_death_message(evt: Event, var: GameState, victim: User, killer: Union[User, str]):
+def on_night_death_message(evt: Event, var: GameState, victim: User, killer: User | str):
     if killer == "@wolves" and victim in VISITED:
-        evt.data["key"] = "visited_victim" if var.role_reveal in ("on", "team") else "visited_victim_no_reveal"
+        evt.data["key"] = (
+            "visited_victim" if var.role_reveal in ("on", "team") else "visited_victim_no_reveal"
+        )
+
 
 @event_listener("chk_nightdone")
 def on_chk_nightdone(evt: Event, var: GameState):
     evt.data["acted"].extend(VISITED)
     evt.data["acted"].extend(PASSED)
     evt.data["nightroles"].extend(get_all_players(var, ("succubus",)))
+
 
 @event_listener("send_role")
 def on_send_role(evt: Event, var: GameState):
@@ -171,21 +215,24 @@ def on_send_role(evt: Event, var: GameState):
         succ = []
         for p in pl:
             if p in succubi:
-                succ.append("{0} ({1})".format(p, role_map["succubus"]))
+                succ.append("{} ({})".format(p, role_map["succubus"]))
             else:
                 succ.append(p.nick)
         succubus.send(messages["succubus_notify"], messages["players_list"].format(succ), sep="\n")
+
 
 @event_listener("gun_shoot")
 def on_gun_shoot(evt: Event, var: GameState, user: User, target: User, role: str):
     if target in get_all_players(var, ("succubus",)):
         evt.data["kill"] = False
 
+
 @event_listener("begin_day")
 def on_begin_day(evt: Event, var: GameState):
     VISITED.clear()
     PASSED.clear()
     FORCE_PASSED.clear()
+
 
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):
@@ -196,12 +243,14 @@ def on_reset(evt: Event, var: GameState):
     PASSED.clear()
     FORCE_PASSED.clear()
 
+
 @event_listener("revealroles")
 def on_revealroles(evt: Event, var: GameState):
     if ENTRANCED:
         evt.data["output"].append(messages["entranced_revealroles"].format(ENTRANCED))
 
+
 @event_listener("get_role_metadata")
-def on_get_role_metadata(evt: Event, var: Optional[GameState], kind: str):
+def on_get_role_metadata(evt: Event, var: GameState | None, kind: str):
     if kind == "role_categories":
         evt.data["succubus"] = {"Neutral", "Win Stealer", "Cursed", "Nocturnal", "Succubi"}

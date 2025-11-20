@@ -1,8 +1,9 @@
-import os.path
 import glob
 import importlib
+import os.path
 
 __all__ = ["import_builtin_roles"]
+
 
 # Imports all role definitions
 def import_builtin_roles():

@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from src import users
 from src.containers import UserDict
 from src.decorators import command
+from src.dispatcher import MessageDispatcher
 from src.events import Event, event_listener
 from src.functions import get_all_players, get_target
-from src.messages import messages
-from src.roles.helper.wolves import is_known_wolf_ally, send_wolfchat_message, register_wolf
-from src.status import try_misdirection, try_exchange, is_awake
-from src.dispatcher import MessageDispatcher
 from src.gamestate import GameState
+from src.messages import messages
+from src.roles.helper.wolves import is_known_wolf_ally, register_wolf, send_wolfchat_message
+from src.status import is_awake, try_exchange, try_misdirection
 from src.trans import NIGHT_IDLE_EXEMPT
 from src.users import User
 
@@ -20,7 +19,16 @@ register_wolf("werecrow")
 
 OBSERVED: UserDict[users.User, users.User] = UserDict()
 
-@command("observe", chan=False, pm=True, playing=True, silenced=True, phases=("night",), roles=("werecrow",))
+
+@command(
+    "observe",
+    chan=False,
+    pm=True,
+    playing=True,
+    silenced=True,
+    phases=("night",),
+    roles=("werecrow",),
+)
 def observe(wrapper: MessageDispatcher, message: str):
     """Observe a player to see whether they are able to act at night."""
     if wrapper.source in OBSERVED:
@@ -41,7 +49,15 @@ def observe(wrapper: MessageDispatcher, message: str):
 
     OBSERVED[wrapper.source] = target
     wrapper.pm(messages["werecrow_observe_success"].format(orig))
-    send_wolfchat_message(var, wrapper.source, messages["wolfchat_observe"].format(wrapper.source, target), {"werecrow"}, role="werecrow", command="observe")
+    send_wolfchat_message(
+        var,
+        wrapper.source,
+        messages["wolfchat_observe"].format(wrapper.source, target),
+        {"werecrow"},
+        role="werecrow",
+        command="observe",
+    )
+
 
 @event_listener("transition_day_begin")
 def on_transition_day_begin(evt: Event, var: GameState):
@@ -52,34 +68,52 @@ def on_transition_day_begin(evt: Event, var: GameState):
         else:
             crow.send(messages["werecrow_failure"].format(target))
 
+
 @event_listener("begin_day")
 def on_begin_day(evt: Event, var: GameState):
     OBSERVED.clear()
 
+
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):
     OBSERVED.clear()
+
 
 @event_listener("chk_nightdone")
 def on_chk_nightdone(evt: Event, var: GameState):
     evt.data["acted"].extend(OBSERVED)
     evt.data["nightroles"].extend(get_all_players(var, ("werecrow",)))
 
+
 @event_listener("del_player")
-def on_del_player(evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool):
+def on_del_player(
+    evt: Event, var: GameState, player: User, all_roles: set[str], death_triggers: bool
+):
     del OBSERVED[:player:]
     for crow, target in list(OBSERVED.items()):
         if target is player:
             NIGHT_IDLE_EXEMPT.add(crow)
             del OBSERVED[crow]
 
+
 @event_listener("new_role")
-def on_new_role(evt: Event, var: GameState, player: User, old_role: Optional[str]):
+def on_new_role(evt: Event, var: GameState, player: User, old_role: str | None):
     # remove the observation if they're turning from a crow into a not-crow
     if old_role == "werecrow" and evt.data["role"] != "werecrow":
         OBSERVED.pop(player, None)
 
+
 @event_listener("get_role_metadata")
-def on_get_role_metadata(evt: Event, var: Optional[GameState], kind: str):
+def on_get_role_metadata(evt: Event, var: GameState | None, kind: str):
     if kind == "role_categories":
-        evt.data["werecrow"] = {"Wolf", "Wolfchat", "Wolfteam", "Killer", "Nocturnal", "Spy", "Village Objective", "Wolf Objective", "Evil"}
+        evt.data["werecrow"] = {
+            "Wolf",
+            "Wolfchat",
+            "Wolfteam",
+            "Killer",
+            "Nocturnal",
+            "Spy",
+            "Village Objective",
+            "Wolf Objective",
+            "Evil",
+        }

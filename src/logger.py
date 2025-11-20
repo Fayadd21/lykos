@@ -1,31 +1,47 @@
 from __future__ import annotations
 
 import collections.abc
-import time
+import importlib
 import json
 import logging
 import logging.handlers
 import re
 import string
 import sys
-import importlib
-from typing import Callable, Sequence, Any, Mapping
+import time
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 from src import config
 
-__all__ = ["UnionFilterMixin", "StreamHandler", "FileHandler", "RotatingFileHandler", "TimedRotatingFileHandler",
-           "IRCTransportHandler", "StringFormatter", "StructuredFormatter", "LogRecord", "init"]
+__all__ = [
+    "UnionFilterMixin",
+    "StreamHandler",
+    "FileHandler",
+    "RotatingFileHandler",
+    "TimedRotatingFileHandler",
+    "IRCTransportHandler",
+    "StringFormatter",
+    "StructuredFormatter",
+    "LogRecord",
+    "init",
+]
+
 
 class UnionFilterMixin(logging.Filterer):
     # Change filter logic so that we log as long as one of the provided filters succeeds.
     # Default is to require all attached filters to succeed in order to log.
     def filter(self, record: logging.LogRecord) -> bool:
         # Ensure debug-level game events aren't logged if we aren't in debug mode
-        if record.levelno == logging.DEBUG and record.name.startswith("game.") and not config.Main.get("debug.enabled"):
+        if (
+            record.levelno == logging.DEBUG
+            and record.name.startswith("game.")
+            and not config.Main.get("debug.enabled")
+        ):
             return False
 
-        for f in self.filters: # type: logging.Filter | Callable
+        for f in self.filters:  # type: logging.Filter | Callable
             if isinstance(f, logging.Filter):
                 val = f.filter(record)
             else:
@@ -34,17 +50,22 @@ class UnionFilterMixin(logging.Filterer):
                 return True
         return False
 
+
 class StreamHandler(UnionFilterMixin, logging.StreamHandler):
     pass
+
 
 class FileHandler(UnionFilterMixin, logging.FileHandler):
     pass
 
+
 class RotatingFileHandler(UnionFilterMixin, logging.handlers.RotatingFileHandler):
     pass
 
+
 class TimedRotatingFileHandler(UnionFilterMixin, logging.handlers.TimedRotatingFileHandler):
     pass
+
 
 class IRCTransportHandler(UnionFilterMixin, logging.Handler):
     def __init__(self, transport: str, destination: str):
@@ -64,6 +85,7 @@ class IRCTransportHandler(UnionFilterMixin, logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         from src import channels
         from src.context import Features
+
         line = self.format(record)
         prefix = None
         channel = self.destination
@@ -79,6 +101,7 @@ class IRCTransportHandler(UnionFilterMixin, logging.Handler):
         line = super().format(record)
         return re.split("\r?\n", line)[0]
 
+
 class StringFormatter(logging.Formatter):
     def __init__(self, tsconfig: dict):
         if tsconfig["enabled"]:
@@ -88,6 +111,7 @@ class StringFormatter(logging.Formatter):
         super().__init__(fmt, datefmt=tsconfig["format"], style="{")
         if tsconfig["utc"]:
             self.converter = time.gmtime
+
 
 class StructuredFormatter(StringFormatter):
     def format(self, record: logging.LogRecord) -> str:
@@ -100,7 +124,7 @@ class StructuredFormatter(StringFormatter):
             "args": record.args,
             "created": record.created,
             "level": record.levelname,
-            "channel": record.name
+            "channel": record.name,
         }
 
         if hasattr(record, "data"):
@@ -113,6 +137,7 @@ class StructuredFormatter(StringFormatter):
             obj["stack"] = self.formatStack(record.stack_info)
 
         return json.dumps(obj)
+
 
 class LogRecord(logging.LogRecord):
     def getMessage(self) -> str:
@@ -138,17 +163,18 @@ class LogRecord(logging.LogRecord):
 
         return msg
 
+
 class _ThrowingFormatter(string.Formatter):
-    def check_unused_args(self,
-                          used_args: Sequence[int | str],
-                          args: Sequence[Any],
-                          kwargs: Mapping[str, Any]) -> None:
+    def check_unused_args(
+        self, used_args: Sequence[int | str], args: Sequence[Any], kwargs: Mapping[str, Any]
+    ) -> None:
         expected_args = set(range(len(args)))
         found_args = {a for a in used_args if isinstance(a, int)}
         expected_kwargs = set(kwargs.keys())
         found_kwargs = {a for a in used_args if isinstance(a, str)}
         if expected_args - found_args or expected_kwargs - found_kwargs:
             raise TypeError("not all arguments converted during string formatting")
+
 
 def init():
     gl = config.Main.get("logging.groups")
@@ -170,7 +196,7 @@ def init():
                 cls = RotatingFileHandler
                 kwargs = {
                     "maxBytes": log["handler"]["rotate"]["max_bytes"],
-                    "backupCount": log["handler"]["rotate"]["backup_count"]
+                    "backupCount": log["handler"]["rotate"]["backup_count"],
                 }
             elif log["handler"]["rotate"]["type"] == "timed":
                 cls = TimedRotatingFileHandler
@@ -179,7 +205,7 @@ def init():
                     "interval": log["handler"]["rotate"]["interval"],
                     "atTime": log["handler"]["rotate"]["at_time"],
                     "utc": log["handler"]["rotate"]["utc"],
-                    "backupCount": log["handler"]["rotate"]["backup_count"]
+                    "backupCount": log["handler"]["rotate"]["backup_count"],
                 }
             else:
                 raise NotImplementedError("Unknown rotation in logging.logs[].handler<file>.rotate")
@@ -203,7 +229,9 @@ def init():
             kwargs = log["handler"]["args"]
             handler = cls(**kwargs)
         else:
-            raise NotImplementedError("Unknown type {} in logging.logs[].handler".format(log["handler"]["type"]))
+            raise NotImplementedError(
+                "Unknown type {} in logging.logs[].handler".format(log["handler"]["type"])
+            )
 
         # Add relevant filters onto the Handler
         for f in groups[log["group"]]:
@@ -218,7 +246,9 @@ def init():
         elif log["format"] == "structured":
             formatter = StructuredFormatter
         else:
-            raise NotImplementedError("Unknown format {} in logging.logs[].format".format(log["format"]))
+            raise NotImplementedError(
+                "Unknown format {} in logging.logs[].format".format(log["format"])
+            )
         handler.setFormatter(formatter(log["timestamp"]))
 
         # Register the handler

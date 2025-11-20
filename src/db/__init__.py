@@ -1,27 +1,63 @@
 from __future__ import annotations
 
-import sqlite3
-import os
 import json
+import os
 import shutil
+import sqlite3
 import sys
-import time
 import threading
+import time
 from collections import defaultdict
 from datetime import datetime
 
 from src import users
-from src.messages import messages
 from src.cats import role_order
+from src.messages import messages
 
-__all__ = ["init_vars", "decrement_stasis", "set_stasis", "get_template", "get_templates", "update_template",
-           "delete_template", "toggle_deadchat", "toggle_notice", "set_pingif", "set_warning", "set_primary_player",
-           "set_pre_restart_state", "set_access", "get_pre_restart_state", "get_warning", "get_warning_points",
-           "get_game_stats", "get_role_stats", "get_role_totals", "get_game_totals", "get_player_totals",
-           "get_warning_sanctions", "get_player_stats", "add_warning", "add_warning_sanction", "acknowledge_warning",
-           "add_game", "list_all_warnings", "list_warnings", "del_warning", "has_unacknowledged_warnings",
-           "expire_tempbans", "expire_stasis", "PREFER_NOTICE", "STASISED", "PING_IF_PREFS", "PING_IF_NUMS",
-           "DEADCHAT_PREFS", "FLAGS", "DENY", "ALL_FLAGS"]
+__all__ = [
+    "init_vars",
+    "decrement_stasis",
+    "set_stasis",
+    "get_template",
+    "get_templates",
+    "update_template",
+    "delete_template",
+    "toggle_deadchat",
+    "toggle_notice",
+    "set_pingif",
+    "set_warning",
+    "set_primary_player",
+    "set_pre_restart_state",
+    "set_access",
+    "get_pre_restart_state",
+    "get_warning",
+    "get_warning_points",
+    "get_game_stats",
+    "get_role_stats",
+    "get_role_totals",
+    "get_game_totals",
+    "get_player_totals",
+    "get_warning_sanctions",
+    "get_player_stats",
+    "add_warning",
+    "add_warning_sanction",
+    "acknowledge_warning",
+    "add_game",
+    "list_all_warnings",
+    "list_warnings",
+    "del_warning",
+    "has_unacknowledged_warnings",
+    "expire_tempbans",
+    "expire_stasis",
+    "PREFER_NOTICE",
+    "STASISED",
+    "PING_IF_PREFS",
+    "PING_IF_NUMS",
+    "DEADCHAT_PREFS",
+    "FLAGS",
+    "DENY",
+    "ALL_FLAGS",
+]
 
 # increment this whenever making a schema change so that the schema upgrade functions run on start
 # they do not run by default for performance reasons
@@ -59,8 +95,10 @@ DENY: defaultdict[str, set[str]] = defaultdict(set)
 
 _ts = threading.local()
 
+
 def init_vars():
     from src.context import lower
+
     conn = _conn()
     c = conn.cursor()
     c.execute("""SELECT
@@ -125,6 +163,7 @@ def init_vars():
             lacc = lower(acc)
             DENY[lacc].add(command)
 
+
 def decrement_stasis(acc=None):
     peid, plid = _get_ids(acc)
     if acc is not None and peid is None:
@@ -140,9 +179,11 @@ def decrement_stasis(acc=None):
     c.execute(sql, params)
     conn.commit()
 
+
 def set_stasis(newamt, acc=None, relative=False):
     peid, plid = _get_ids(acc, add=True)
     _set_stasis(int(newamt), peid, relative)
+
 
 def _set_stasis(newamt, peid, relative=False):
     conn = _conn()
@@ -156,22 +197,29 @@ def _set_stasis(newamt, peid, relative=False):
     if newamt > oldamt:
         delta = newamt - oldamt
         # increasing stasis, so need to update expiry
-        c.execute("""UPDATE person
+        c.execute(
+            f"""UPDATE person
                      SET
                        stasis_amount = ?,
                        stasis_expires = datetime(CASE WHEN stasis_expires IS NULL
                                                         OR stasis_expires <= datetime('now')
                                                       THEN 'now'
                                                       ELSE stasis_expires END,
-                                                 '+{0} hours')
-                     WHERE id = ?""".format(int(delta)), (newamt, peid))
+                                                 '+{int(delta)} hours')
+                     WHERE id = ?""",
+            (newamt, peid),
+        )
     else:
         # decreasing stasis, don't touch expiry
-        c.execute("""UPDATE person
+        c.execute(
+            """UPDATE person
                      SET stasis_amount = ?
-                     WHERE id = ?""", (newamt, peid))
+                     WHERE id = ?""",
+            (newamt, peid),
+        )
 
     conn.commit()
+
 
 def expire_stasis():
     conn = _conn()
@@ -185,6 +233,7 @@ def expire_stasis():
                    AND stasis_expires <= datetime('now')""")
     conn.commit()
 
+
 def get_template(name):
     conn = _conn()
     c = conn.cursor()
@@ -194,6 +243,7 @@ def get_template(name):
         return None, set()
     return row[0], row[1]
 
+
 def get_templates():
     conn = _conn()
     c = conn.cursor()
@@ -202,6 +252,7 @@ def get_templates():
     for name, flags in c:
         tpls.append((name, flags))
     return tpls
+
 
 def update_template(name, flags):
     conn = _conn()
@@ -213,6 +264,7 @@ def update_template(name, flags):
         c.execute("UPDATE access_template SET flags = ? WHERE id = ?", (flags, tid))
     conn.commit()
 
+
 def delete_template(name):
     conn = _conn()
     tid, _ = get_template(name)
@@ -221,6 +273,7 @@ def delete_template(name):
         c.execute("DELETE FROM access WHERE template = ?", (tid,))
         c.execute("DELETE FROM access_template WHERE id = ?", (tid,))
     conn.commit()
+
 
 def set_access(acc, flags=None, tid=None):
     peid, plid = _get_ids(acc, add=True)
@@ -231,27 +284,37 @@ def set_access(acc, flags=None, tid=None):
     if flags is None and tid is None:
         c.execute("DELETE FROM access WHERE person = ?", (peid,))
     elif tid is not None:
-        c.execute("""INSERT OR REPLACE INTO access
+        c.execute(
+            """INSERT OR REPLACE INTO access
                      (person, template, flags)
-                     VALUES (?, ?, NULL)""", (peid, tid))
+                     VALUES (?, ?, NULL)""",
+            (peid, tid),
+        )
     else:
-        c.execute("""INSERT OR REPLACE INTO access
+        c.execute(
+            """INSERT OR REPLACE INTO access
                      (person, template, flags)
-                     VALUES (?, NULL, ?)""", (peid, flags))
+                     VALUES (?, NULL, ?)""",
+            (peid, flags),
+        )
 
     conn.commit()
+
 
 def toggle_notice(acc):
     _toggle_thing("notice", acc)
 
+
 def toggle_deadchat(acc):
     _toggle_thing("deadchat", acc)
+
 
 def set_pingif(val, acc):
     _set_thing("pingif", val, acc, raw=False)
 
+
 def add_game(mode, size, started, finished, winner, players, options):
-    """ Adds a game record to the database.
+    """Adds a game record to the database.
 
     mode: Game mode (string)
     size: Game size on start (int)
@@ -281,21 +344,34 @@ def add_game(mode, size, started, finished, winner, players, options):
 
     conn = _conn()
     c = conn.cursor()
-    c.execute("""INSERT INTO game (gamemode, options, started, finished, gamesize, winner)
-                 VALUES (?, ?, ?, ?, ?, ?)""", (mode, json.dumps(options), started, finished, size, str(winner)))
+    c.execute(
+        """INSERT INTO game (gamemode, options, started, finished, gamesize, winner)
+                 VALUES (?, ?, ?, ?, ?, ?)""",
+        (mode, json.dumps(options), started, finished, size, str(winner)),
+    )
     gameid = c.lastrowid
     for p in players:
-        c.execute("""INSERT INTO game_player (game, player, team_win, indiv_win, dced, count_game)
-                     VALUES (?, ?, ?, ?, ?, ?)""", (gameid, p["playerid"], p["team_win"], p["individual_win"], p["dced"], p["count_game"]))
+        c.execute(
+            """INSERT INTO game_player (game, player, team_win, indiv_win, dced, count_game)
+                     VALUES (?, ?, ?, ?, ?, ?)""",
+            (gameid, p["playerid"], p["team_win"], p["individual_win"], p["dced"], p["count_game"]),
+        )
         gpid = c.lastrowid
         for role in p["all_roles"]:
-            c.execute("""INSERT INTO game_player_role (game_player, role, special)
-                         VALUES (?, ?, 0)""", (gpid, role))
+            c.execute(
+                """INSERT INTO game_player_role (game_player, role, special)
+                         VALUES (?, ?, 0)""",
+                (gpid, role),
+            )
         for sq in p["special"]:
-            c.execute("""INSERT INTO game_player_role (game_player, role, special)
-                         VALUES (?, ?, 1)""", (gpid, sq))
+            c.execute(
+                """INSERT INTO game_player_role (game_player, role, special)
+                         VALUES (?, ?, 1)""",
+                (gpid, sq),
+            )
 
     conn.commit()
+
 
 def get_player_stats(acc, role):
     peid, plid = _get_ids(acc)
@@ -303,7 +379,8 @@ def get_player_stats(acc, role):
         return messages["db_pstats_no_game"].format(acc)
     conn = _conn()
     c = conn.cursor()
-    c.execute("""SELECT
+    c.execute(
+        """SELECT
                    gpr.role AS role,
                    SUM(gp.count_game AND gp.team_win) AS team,
                    SUM(gp.count_game AND gp.indiv_win) AS indiv,
@@ -319,7 +396,9 @@ def get_player_stats(acc, role):
                    ON gpr.game_player = gp.id
                    AND gpr.role = ?
                  WHERE pe.id = ?
-                 GROUP BY role""", (role, peid))
+                 GROUP BY role""",
+        (role, peid),
+    )
     row = c.fetchone()
     name = _get_display_name(peid)
     if row:
@@ -332,8 +411,19 @@ def get_player_stats(acc, role):
             teamp = team / count_total
             indivp = indiv / count_total
             overallp = overall / count_total
-        return messages["db_player_stats"].format(name, role=role, team=team, teamp=teamp, indiv=indiv, indivp=indivp, overall=overall, overallp=overallp, total=total)
+        return messages["db_player_stats"].format(
+            name,
+            role=role,
+            team=team,
+            teamp=teamp,
+            indiv=indiv,
+            indivp=indivp,
+            overall=overall,
+            overallp=overallp,
+            total=total,
+        )
     return messages["db_pstats_no_role"].format(name, role)
+
 
 def get_player_totals(acc):
     peid, plid = _get_ids(acc)
@@ -341,7 +431,8 @@ def get_player_totals(acc):
         return messages["db_pstats_no_game"].format(acc), []
     conn = _conn()
     c = conn.cursor()
-    c.execute("""SELECT
+    c.execute(
+        """SELECT
                    gpr.role AS role,
                    COUNT(1) AS total,
                    SUM(gp.count_game) AS count_total
@@ -353,17 +444,22 @@ def get_player_totals(acc):
                  JOIN game_player_role gpr
                    ON gpr.game_player = gp.id
                  WHERE pe.id = ?
-                 GROUP BY role""", (peid,))
+                 GROUP BY role""",
+        (peid,),
+    )
     tmp = {}
     for row in c:
         tmp[row[0]] = (row[1], row[2])
-    c.execute("""SELECT SUM(gp.count_game AND (gp.team_win OR gp.indiv_win))
+    c.execute(
+        """SELECT SUM(gp.count_game AND (gp.team_win OR gp.indiv_win))
                  FROM game_player gp
                  JOIN player pl
                    ON pl.id = gp.player
                  JOIN person pe
                    ON pe.id = pl.person
-                 WHERE pe.id = ?""", (peid,))
+                 WHERE pe.id = ?""",
+        (peid,),
+    )
     won_games = c.fetchone()[0]
     order = list(role_order())
     name = _get_display_name(peid)
@@ -377,6 +473,7 @@ def get_player_totals(acc):
     else:
         wonp = won_games / count_games
     return messages["db_total_games"].format(name, count_games, wonp), totals
+
 
 def get_game_stats(mode, size):
     conn = _conn()
@@ -392,7 +489,8 @@ def get_game_stats(mode, size):
         return messages["db_gstats_no_game"].format(size)
 
     if mode == "*":
-        c.execute("""SELECT
+        c.execute(
+            """SELECT
                        winner AS team,
                        COUNT(1) AS games,
                        CASE winner
@@ -405,9 +503,12 @@ def get_game_stats(mode, size):
                        gamesize = ?
                        AND winner IS NOT NULL
                      GROUP BY team
-                     ORDER BY ord, team""", (size,))
+                     ORDER BY ord, team""",
+            (size,),
+        )
     else:
-        c.execute("""SELECT
+        c.execute(
+            """SELECT
                        winner AS team,
                        COUNT(1) AS games,
                        CASE winner
@@ -421,7 +522,9 @@ def get_game_stats(mode, size):
                        AND gamesize = ?
                        AND winner IS NOT NULL
                      GROUP BY team
-                     ORDER BY ord, team""", (mode, size))
+                     ORDER BY ord, team""",
+            (mode, size),
+        )
 
     key = "db_gstats_specific"
     if mode == "*":
@@ -429,10 +532,15 @@ def get_game_stats(mode, size):
 
     bits = []
     for row in c:
-        bits.append(messages["db_gstats_win"].format(messages.raw("_role_categories", row[0])[0], row[1], row[1]/total_games))
+        bits.append(
+            messages["db_gstats_win"].format(
+                messages.raw("_role_categories", row[0])[0], row[1], row[1] / total_games
+            )
+        )
     bits.append(messages["db_gstats_total"].format(total_games))
 
     return messages[key].format(size, mode, bits)
+
 
 def get_game_totals(mode):
     conn = _conn()
@@ -457,13 +565,16 @@ def get_game_totals(mode):
                      GROUP BY gamesize
                      ORDER BY gamesize""")
     else:
-        c.execute("""SELECT
+        c.execute(
+            """SELECT
                        gamesize,
                        COUNT(1) AS games
                      FROM game
                      WHERE gamemode = ?
                      GROUP BY gamesize
-                     ORDER BY gamesize""", (mode,))
+                     ORDER BY gamesize""",
+            (mode,),
+        )
     totals = []
     for row in c:
         totals.append(messages["db_gstats_gm_p"].format(row[0], row[1]))
@@ -472,12 +583,14 @@ def get_game_totals(mode):
         return messages["db_gstats_gm_all_total"].format(total_games, totals)
     return messages["db_gstats_gm_specific_total"].format(mode, total_games, totals)
 
+
 def get_role_stats(role, mode=None):
     conn = _conn()
     c = conn.cursor()
 
     if mode is None:
-        c.execute("""SELECT
+        c.execute(
+            """SELECT
                    gpr.role AS role,
                    SUM(gp.team_win) AS team,
                    SUM(gp.indiv_win) AS indiv,
@@ -489,9 +602,12 @@ def get_role_stats(role, mode=None):
                  JOIN game_player_role gpr
                    ON gpr.game_player = gp.id
                  WHERE role = ?
-                 GROUP BY role""", (role,))
+                 GROUP BY role""",
+            (role,),
+        )
     else:
-        c.execute("""SELECT
+        c.execute(
+            """SELECT
                    gpr.role AS role,
                    SUM(gp.team_win) AS team,
                    SUM(gp.indiv_win) AS indiv,
@@ -505,20 +621,42 @@ def get_role_stats(role, mode=None):
                    ON gpr.game_player = gp.id
                  WHERE role = ?
                    AND gamemode = ?
-                 GROUP BY role, gamemode""", (role, mode))
+                 GROUP BY role, gamemode""",
+            (role, mode),
+        )
 
     row = c.fetchone()
     if row:
         if mode is None:
             role, team, indiv, overall, total = row
-            return messages["db_role_stats_global"].format(role=role, team=team, teamp=team/total, indiv=indiv, indivp=indiv/total, overall=overall, overallp=overall/total, total=total)
+            return messages["db_role_stats_global"].format(
+                role=role,
+                team=team,
+                teamp=team / total,
+                indiv=indiv,
+                indivp=indiv / total,
+                overall=overall,
+                overallp=overall / total,
+                total=total,
+            )
 
         role, team, indiv, overall, total, gamemode = row
-        return messages["db_role_stats_specific"].format(gamemode, role=role, team=team, teamp=team/total, indiv=indiv, indivp=indiv/total, overall=overall, overallp=overall/total, total=total)
+        return messages["db_role_stats_specific"].format(
+            gamemode,
+            role=role,
+            team=team,
+            teamp=team / total,
+            indiv=indiv,
+            indivp=indiv / total,
+            overall=overall,
+            overallp=overall / total,
+            total=total,
+        )
 
     if mode is None:
         return messages["db_rstats_none"].format(role)
     return messages["db_rstats_specific"].format(role, mode)
+
 
 def get_role_totals(mode=None):
     conn = _conn()
@@ -541,7 +679,8 @@ def get_role_totals(mode=None):
                   GROUP BY role
                   ORDER BY count DESC""")
     else:
-        c.execute("""SELECT
+        c.execute(
+            """SELECT
                    gpr.role AS role,
                   COUNT(1) AS count
                   FROM game_player_role gpr
@@ -551,7 +690,9 @@ def get_role_totals(mode=None):
                     ON g.id = gp.game
                   WHERE g.gamemode = ?
                   GROUP BY role
-                  ORDER BY count DESC""", (mode,))
+                  ORDER BY count DESC""",
+            (mode,),
+        )
 
     totals = []
     for role, count in c:
@@ -559,6 +700,7 @@ def get_role_totals(mode=None):
     if mode is None:
         return messages["db_rstats_total"].format(total_games), totals
     return messages["db_rstats_total_mode"].format(mode, total_games), totals
+
 
 def set_primary_player(acc):
     # set acc to be the primary player for the corresponding person
@@ -568,11 +710,13 @@ def set_primary_player(acc):
     c.execute("UPDATE person SET primary_player = ? WHERE id = ?", (plid, peid))
     conn.commit()
 
+
 def get_warning_points(acc):
     peid, plid = _get_ids(acc)
     conn = _conn()
     c = conn.cursor()
-    c.execute("""SELECT COALESCE(SUM(amount), 0)
+    c.execute(
+        """SELECT COALESCE(SUM(amount), 0)
                  FROM warning
                  WHERE
                    target = ?
@@ -580,9 +724,12 @@ def get_warning_points(acc):
                    AND (
                      expires IS NULL
                      OR expires > datetime('now')
-                   )""", (peid,))
+                   )""",
+        (peid,),
+    )
     row = c.fetchone()
     return row[0]
+
 
 def has_unacknowledged_warnings(acc):
     peid, plid = _get_ids(acc)
@@ -590,7 +737,8 @@ def has_unacknowledged_warnings(acc):
         return False
     conn = _conn()
     c = conn.cursor()
-    c.execute("""SELECT COALESCE(MIN(acknowledged), 1)
+    c.execute(
+        """SELECT COALESCE(MIN(acknowledged), 1)
                  FROM warning
                  WHERE
                    target = ?
@@ -598,9 +746,12 @@ def has_unacknowledged_warnings(acc):
                    AND (
                      expires IS NULL
                      OR expires > datetime('now')
-                   )""", (peid,))
+                   )""",
+        (peid,),
+    )
     row = c.fetchone()
     return not bool(row[0])
+
 
 def list_all_warnings(list_all=False, skip=0, show=0):
     conn = _conn()
@@ -642,22 +793,27 @@ def list_all_warnings(list_all=False, skip=0, show=0):
                 """
     sql += "ORDER BY warning.issued DESC\n"
     if show > 0:
-        sql += "LIMIT {0} OFFSET {1}".format(show, skip)
+        sql += f"LIMIT {show} OFFSET {skip}"
 
     c.execute(sql, (users.Bot.name,))
     warnings = []
     for row in c:
-        warnings.append({"id": row[0],
-                         "target": row[1],
-                         "sender": row[2],
-                         "amount": row[3],
-                         "issued": row[4],
-                         "expires": row[5],
-                         "expired": row[6],
-                         "ack": row[7],
-                         "deleted": row[8],
-                         "reason": row[9]})
+        warnings.append(
+            {
+                "id": row[0],
+                "target": row[1],
+                "sender": row[2],
+                "amount": row[3],
+                "issued": row[4],
+                "expires": row[5],
+                "expired": row[6],
+                "ack": row[7],
+                "deleted": row[8],
+                "reason": row[9],
+            }
+        )
     return warnings
+
 
 def list_warnings(acc, expired=False, deleted=False, skip=0, show=0):
     peid, plid = _get_ids(acc)
@@ -701,22 +857,27 @@ def list_warnings(acc, expired=False, deleted=False, skip=0, show=0):
                     )"""
     sql += " ORDER BY warning.issued DESC"
     if show > 0:
-        sql += " LIMIT {0} OFFSET {1}".format(show, skip)
+        sql += f" LIMIT {show} OFFSET {skip}"
 
     c.execute(sql, (users.Bot.name, peid))
     warnings = []
     for row in c:
-        warnings.append({"id": row[0],
-                         "target": row[1],
-                         "sender": row[2],
-                         "amount": row[3],
-                         "issued": row[4],
-                         "expires": row[5],
-                         "expired": row[6],
-                         "ack": row[7],
-                         "deleted": row[8],
-                         "reason": row[9]})
+        warnings.append(
+            {
+                "id": row[0],
+                "target": row[1],
+                "sender": row[2],
+                "amount": row[3],
+                "issued": row[4],
+                "expires": row[5],
+                "expired": row[6],
+                "ack": row[7],
+                "deleted": row[8],
+                "reason": row[9],
+            }
+        )
     return warnings
+
 
 def get_warning(warn_id, acc=None):
     conn = _conn()
@@ -767,20 +928,23 @@ def get_warning(warn_id, acc=None):
     if not row:
         return None
 
-    return {"id": row[0],
-            "target": row[1],
-            "sender": row[2],
-            "amount": row[3],
-            "issued": row[4],
-            "expires": row[5],
-            "expired": row[6],
-            "ack": row[7],
-            "deleted": row[8],
-            "reason": row[9],
-            "notes": row[10],
-            "deleted_by": row[11],
-            "deleted_on": row[12],
-            "sanctions": get_warning_sanctions(warn_id)}
+    return {
+        "id": row[0],
+        "target": row[1],
+        "sender": row[2],
+        "amount": row[3],
+        "issued": row[4],
+        "expires": row[5],
+        "expired": row[6],
+        "ack": row[7],
+        "deleted": row[8],
+        "reason": row[9],
+        "notes": row[10],
+        "deleted_by": row[11],
+        "deleted_on": row[12],
+        "sanctions": get_warning_sanctions(warn_id),
+    }
+
 
 def get_warning_sanctions(warn_id):
     conn = _conn()
@@ -797,12 +961,14 @@ def get_warning_sanctions(warn_id):
 
     return sanctions
 
+
 def add_warning(tacc, sacc, amount, reason, notes, expires):
     teid, tlid = _get_ids(tacc, add=True)
     seid, slid = _get_ids(sacc)
     conn = _conn()
     c = conn.cursor()
-    c.execute("""INSERT INTO warning
+    c.execute(
+        """INSERT INTO warning
                  (
                  target, sender, amount,
                  issued, expires,
@@ -815,18 +981,24 @@ def add_warning(tacc, sacc, amount, reason, notes, expires):
                    datetime('now'), ?,
                    ?, ?,
                    0
-                 )""", (teid, seid, amount, expires, reason, notes))
+                 )""",
+        (teid, seid, amount, expires, reason, notes),
+    )
 
     conn.commit()
     return c.lastrowid
 
+
 def add_warning_sanction(warning, sanction, data):
     conn = _conn()
     c = conn.cursor()
-    c.execute("""INSERT INTO warning_sanction
+    c.execute(
+        """INSERT INTO warning_sanction
                  (warning, sanction, data)
                  VALUES
-                 (?, ?, ?)""", (warning, sanction, data))
+                 (?, ?, ?)""",
+        (warning, sanction, data),
+    )
 
     conn.commit()
 
@@ -848,11 +1020,13 @@ def add_warning_sanction(warning, sanction, data):
             c.execute(sql, (plid, data))
         return acclist
 
+
 def del_warning(warning, acc):
     peid, plid = _get_ids(acc)
     conn = _conn()
     c = conn.cursor()
-    c.execute("""UPDATE warning
+    c.execute(
+        """UPDATE warning
                  SET
                    acknowledged = 1,
                    deleted = 1,
@@ -860,24 +1034,32 @@ def del_warning(warning, acc):
                    deleted_by = ?
                  WHERE
                    id = ?
-                   AND deleted = 0""", (peid, warning))
+                   AND deleted = 0""",
+        (peid, warning),
+    )
 
     conn.commit()
+
 
 def set_warning(warning, expires, reason, notes):
     conn = _conn()
     c = conn.cursor()
-    c.execute("""UPDATE warning
+    c.execute(
+        """UPDATE warning
                  SET reason = ?, notes = ?, expires = ?
-                 WHERE id = ?""", (reason, notes, expires, warning))
+                 WHERE id = ?""",
+        (reason, notes, expires, warning),
+    )
 
     conn.commit()
+
 
 def acknowledge_warning(warning):
     conn = _conn()
     c = conn.cursor()
     c.execute("UPDATE warning SET acknowledged = 1 WHERE id = ?", (warning,))
     conn.commit()
+
 
 def expire_tempbans():
     conn = _conn()
@@ -915,6 +1097,7 @@ def expire_tempbans():
     conn.commit()
     return acclist
 
+
 def get_data(acc, path=()):
     conn = _conn()
     c = conn.cursor()
@@ -933,6 +1116,7 @@ def get_data(acc, path=()):
             return None
         data = data[p]
     return data
+
 
 def set_data(acc, path, key, value):
     conn = _conn()
@@ -953,6 +1137,7 @@ def set_data(acc, path, key, value):
     cur[key] = value
     c.execute("UPDATE person SET data = ? WHERE id = ?", (json.dumps(data), peid))
 
+
 # noinspection SqlWithoutWhere
 def get_pre_restart_state():
     conn = _conn()
@@ -972,6 +1157,7 @@ def get_pre_restart_state():
     conn.commit()
     return players
 
+
 # noinspection SqlWithoutWhere
 def set_pre_restart_state(players):
     if not players:
@@ -980,6 +1166,7 @@ def set_pre_restart_state(players):
     c = conn.cursor()
     c.execute("UPDATE pre_restart_state SET players = ?", (" ".join(players),))
     conn.commit()
+
 
 def _upgrade(oldversion):
     # try to make a backup copy of the database
@@ -991,7 +1178,10 @@ def _upgrade(oldversion):
         have_backup = True
         print("Database backup created at data.sqlite3.bak...", file=sys.stderr)
     except OSError:
-        print("Database backup failed! Hit Ctrl+C to abort, otherwise upgrade will continue in 5 seconds...", file=sys.stderr)
+        print(
+            "Database backup failed! Hit Ctrl+C to abort, otherwise upgrade will continue in 5 seconds...",
+            file=sys.stderr,
+        )
         time.sleep(5)
 
     dn = os.path.dirname(__file__)
@@ -1003,11 +1193,11 @@ def _upgrade(oldversion):
             # Update FKs to be deferrable, update collations to nocase where it makes sense,
             # and clean up how fool wins are tracked (giving fools team wins instead of saving the winner's
             # player id as a string). When nocasing players, this may cause some records to be merged.
-            with open(os.path.join(dn, "upgrade2.sql"), "rt") as f:
+            with open(os.path.join(dn, "upgrade2.sql")) as f:
                 c.executescript(f.read())
         if oldversion < 3:
             print("Upgrade from version 2 to 3...", file=sys.stderr)
-            with open(os.path.join(dn, "upgrade3.sql"), "rt") as f:
+            with open(os.path.join(dn, "upgrade3.sql")) as f:
                 c.executescript(f.read())
         if oldversion < 4:
             print("Upgrade from version 3 to 4...", file=sys.stderr)
@@ -1023,13 +1213,13 @@ def _upgrade(oldversion):
             print("Upgrade from version 6 to 7...", file=sys.stderr)
             # add source column to player and initialize it to 'irc'
             # also delete hostmask column
-            with open(os.path.join(dn, "upgrade7.sql"), "rt") as f:
+            with open(os.path.join(dn, "upgrade7.sql")) as f:
                 c.executescript(f.read())
         if oldversion < 8:
             print("Upgrade from version 7 to 8...", file=sys.stderr)
             # add columns to person to track current and total achievement points
             # and an achievements table to track exactly which achievements were earned by them
-            with open(os.path.join(dn, "upgrade8.sql"), "rt") as f:
+            with open(os.path.join(dn, "upgrade8.sql")) as f:
                 c.executescript(f.read())
         if oldversion < 9:
             print("Upgrade from version 8 to 9...", file=sys.stderr)
@@ -1066,18 +1256,25 @@ def _upgrade(oldversion):
         print("Upgrades complete!", file=sys.stderr)
 
     except sqlite3.Error:
-        print("An error has occurred while upgrading the database schema.",
-              "Please report this issue to #lykos on irc.libera.chat.",
-              "Include all of the following details in your report:",
-              sep="\n", file=sys.stderr)
+        print(
+            "An error has occurred while upgrading the database schema.",
+            "Please report this issue to #lykos on irc.libera.chat.",
+            "Include all of the following details in your report:",
+            sep="\n",
+            file=sys.stderr,
+        )
         if have_backup:
             try:
                 shutil.copyfile("data.sqlite3.bak", "data.sqlite3")
             except OSError:
-                print("An error has occurred while restoring your database backup.",
-                      "You can manually move data.sqlite3.bak to data.sqlite3 to restore the original database.",
-                      sep="\n", file=sys.stderr)
+                print(
+                    "An error has occurred while restoring your database backup.",
+                    "You can manually move data.sqlite3.bak to data.sqlite3 to restore the original database.",
+                    sep="\n",
+                    file=sys.stderr,
+                )
         raise
+
 
 def _migrate():
     # try to make a backup copy of the database
@@ -1087,7 +1284,7 @@ def _migrate():
         pass
     dn = os.path.dirname(__file__)
     conn = _conn()
-    with open(os.path.join(dn, "db.sql"), "rt") as f1, open(os.path.join(dn, "migrate.sql"), "rt") as f2:
+    with open(os.path.join(dn, "db.sql")) as f1, open(os.path.join(dn, "migrate.sql")) as f2:
         c = conn.cursor()
         #######################################################
         # Step 1: install the new schema (from db.sql script) #
@@ -1106,17 +1303,20 @@ def _migrate():
 
         conn.commit()
 
+
 def _install():
     dn = os.path.dirname(__file__)
     conn = _conn()
-    with open(os.path.join(dn, "db.sql"), "rt") as f1:
+    with open(os.path.join(dn, "db.sql")) as f1:
         c = conn.cursor()
         c.executescript(f1.read())
         c.execute("PRAGMA user_version = " + str(SCHEMA_VERSION))
         conn.commit()
 
+
 def _get_ids(acc, add=False, casemap="ascii"):
     from src.context import lower
+
     conn = _conn()
     c = conn.cursor()
     if acc == "*":
@@ -1128,13 +1328,16 @@ def _get_ids(acc, add=False, casemap="ascii"):
     rfc1459_acc = lower(acc, casemapping="rfc1459")
     strict_acc = lower(acc, casemapping="strict-rfc1459")
 
-    c.execute("""SELECT pe.id, pl.id, pl.account_display
+    c.execute(
+        f"""SELECT pe.id, pl.id, pl.account_display
                  FROM player pl
                  JOIN person pe
                    ON pe.id = pl.person
                  WHERE
-                   pl.account_lower_{0} = ?
-                   AND pl.active = 1""".format(casemap), (acc,))
+                   pl.account_lower_{casemap} = ?
+                   AND pl.active = 1""",
+        (acc,),
+    )
     row = c.fetchone()
     peid = None
     plid = None
@@ -1153,27 +1356,32 @@ def _get_ids(acc, add=False, casemap="ascii"):
         peid, plid, display_acc = row
         if acc != display_acc:
             # normalize case in the db to what it should be
-            c.execute("""UPDATE player
+            c.execute(
+                """UPDATE player
                          SET
                            account_display=?,
                            account_lower_ascii=?,
                            account_lower_rfc1459=?,
                            account_lower_rfc1459_strict=?
                          WHERE id=?""",
-                      (acc, ascii_acc, rfc1459_acc, strict_acc, row[1]))
+                (acc, ascii_acc, rfc1459_acc, strict_acc, row[1]),
+            )
 
             conn.commit()
             # fix up our vars
             init_vars()
     elif add:
-        c.execute("""INSERT INTO player
+        c.execute(
+            """INSERT INTO player
                      (
                        account_display,
                        account_lower_ascii,
                        account_lower_rfc1459,
                        account_lower_rfc1459_strict
                      )
-                     VALUES (?, ?, ?, ?)""", (acc, ascii_acc, rfc1459_acc, strict_acc))
+                     VALUES (?, ?, ?, ?)""",
+            (acc, ascii_acc, rfc1459_acc, strict_acc),
+        )
         plid = c.lastrowid
         c.execute("INSERT INTO person (primary_player) VALUES (?)", (plid,))
         peid = c.lastrowid
@@ -1181,41 +1389,51 @@ def _get_ids(acc, add=False, casemap="ascii"):
         conn.commit()
     return peid, plid
 
+
 def _get_display_name(peid):
     if peid is None:
         return None
     conn = _conn()
     c = conn.cursor()
-    c.execute("""SELECT pp.account_display
+    c.execute(
+        """SELECT pp.account_display
                  FROM person pe
                  JOIN player pp
                    ON pp.id = pe.primary_player
-                 WHERE pe.id = ?""", (peid,))
+                 WHERE pe.id = ?""",
+        (peid,),
+    )
     return c.fetchone()[0]
+
 
 def _total_games(peid):
     if peid is None:
         return 0
     conn = _conn()
     c = conn.cursor()
-    c.execute("""SELECT COUNT(DISTINCT gp.game)
+    c.execute(
+        """SELECT COUNT(DISTINCT gp.game)
                  FROM person pe
                  JOIN player pl
                    ON pl.person = pe.id
                  JOIN game_player gp
                    ON gp.player = pl.id
                  WHERE
-                   pe.id = ?""", (peid,))
+                   pe.id = ?""",
+        (peid,),
+    )
     # aggregates without GROUP BY always have exactly one row,
     # so no need to check for None here
     return c.fetchone()[0]
+
 
 def _countable_games(peid):
     if peid is None:
         return 0
     conn = _conn()
     c = conn.cursor()
-    c.execute("""SELECT COUNT(DISTINCT gp.game)
+    c.execute(
+        """SELECT COUNT(DISTINCT gp.game)
                  FROM person pe
                  JOIN player pl
                    ON pl.person = pe.id
@@ -1223,10 +1441,13 @@ def _countable_games(peid):
                    ON gp.player = pl.id
                  WHERE
                    pe.id = ?
-                   AND gp.count_game = 1""", (peid,))
+                   AND gp.count_game = 1""",
+        (peid,),
+    )
     # aggregates without GROUP BY always have exactly one row,
     # so no need to check for None here
     return c.fetchone()[0]
+
 
 def _set_thing(thing, val, acc, raw=False):
     conn = _conn()
@@ -1237,11 +1458,13 @@ def _set_thing(thing, val, acc, raw=False):
     else:
         params = (val, peid)
         val = "?"
-    c.execute("""UPDATE person SET {0} = {1} WHERE id = ?""".format(thing, val), params)
+    c.execute(f"""UPDATE person SET {thing} = {val} WHERE id = ?""", params)
     conn.commit()
 
+
 def _toggle_thing(thing, acc):
-    _set_thing(thing, "CASE {0} WHEN 1 THEN 0 ELSE 1 END".format(thing), acc, raw=True)
+    _set_thing(thing, f"CASE {thing} WHEN 1 THEN 0 ELSE 1 END", acc, raw=True)
+
 
 def _conn():
     try:
@@ -1252,6 +1475,7 @@ def _conn():
         c.execute("PRAGMA foreign_keys = ON")
         _ts.conn.commit()
         return _ts.conn
+
 
 def _init():
     need_install = not os.path.isfile("data.sqlite3")
@@ -1275,6 +1499,7 @@ def _init():
         _migrate()
     elif ver < SCHEMA_VERSION:
         _upgrade(ver)
+
 
 # run db initialization once module is loaded
 _init()

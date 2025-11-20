@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from src import channels, config, users
-from src.functions import get_players
+from src import channels, users
+
 
 class MessageDispatcher:
     """Dispatcher class for raw IRC messages."""
@@ -40,7 +40,7 @@ class MessageDispatcher:
         """Reply to the user, either in channel or privately."""
         first = ""
         if prefix_nick:
-            first = "{0}: ".format(self.source)
+            first = f"{self.source}: "
         if self.private:
             self.source.send(*messages, **kwargs)
         else:

@@ -17,40 +17,46 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import traceback
-import sys
-import os
 import argparse
 import logging
+import os
+import sys
+import traceback
 from pathlib import Path
 
 ver = sys.version_info
 if ver < (3, 11):
     print("Python 3.11 or newer is required to run the bot.", file=sys.stderr)
-    print("You are currently using {0}.{1}.{2}".format(ver[0], ver[1], ver[2]), file=sys.stderr)
+    print(f"You are currently using {ver[0]}.{ver[1]}.{ver[2]}", file=sys.stderr)
     sys.exit(1)
 
-try: # need to manually add dependencies here
+try:  # need to manually add dependencies here
     import antlr4
     import requests
     import ruamel.yaml
 except ImportError:
-    print("\n".join([
-        "*** Missing dependencies! ***".center(80),
-        "Please install the missing dependencies by running the following command:",
-        "",
-        "    poetry install",
-        "",
-        "This will automatically create a virtual environment and install all required packages",
-        "defined in pyproject.toml.",
-        "",
-        "If you don't have Poetry installed, visit:",
-        "https://python-poetry.org/docs/#installation",
-        "",
-        "If you need any further help with setting up and/or running the bot,",
-        "  we will be happy to help you in #lykos on irc.libera.chat",
-        "",
-        "- The lykos developers"]), file=sys.stderr)
+    print(
+        "\n".join(
+            [
+                "*** Missing dependencies! ***".center(80),
+                "Please install the missing dependencies by running the following command:",
+                "",
+                "    poetry install",
+                "",
+                "This will automatically create a virtual environment and install all required packages",
+                "defined in pyproject.toml.",
+                "",
+                "If you don't have Poetry installed, visit:",
+                "https://python-poetry.org/docs/#installation",
+                "",
+                "If you need any further help with setting up and/or running the bot,",
+                "  we will be happy to help you in #lykos on irc.libera.chat",
+                "",
+                "- The lykos developers",
+            ]
+        ),
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 
@@ -60,8 +66,10 @@ except ImportError:
 #              whatever is present in botconfig.yml. If specified alongside --debug, configuration in
 #              botconfig.debug.yml takes precedence over configuration defined here.
 parser = argparse.ArgumentParser()
-parser.add_argument('--debug', action='store_true', help="Run bot in debug mode. Loads botconfig.debug.yml.")
-parser.add_argument('--config', help="Path to file to load in addition to botconfig.yml.")
+parser.add_argument(
+    "--debug", action="store_true", help="Run bot in debug mode. Loads botconfig.debug.yml."
+)
+parser.add_argument("--config", help="Path to file to load in addition to botconfig.yml.")
 
 args = parser.parse_args()
 if args.debug:
@@ -74,18 +82,23 @@ if args.config:
     os.environ["BOTCONFIG"] = str(p.resolve())
 
 from oyoyo.client import IRCClient, TokenBucket
+from src import config, handler
 
-from src import handler, config
 
 def main():
     # fetch IRC transport
     irc = config.Main.get("transports[0].type", None)
     if irc != "irc":
-        print("\n".join([
-            "botconfig.yml is not configured. If you have an old botconfig.py file,",
-            "it will no longer be loaded. Please copy all relevant configuration to botconfig.yml.",
-            "Please see comments in botconfig.yml or check https://ww.chat/config for help",
-            "on how to configure lykos."]))
+        print(
+            "\n".join(
+                [
+                    "botconfig.yml is not configured. If you have an old botconfig.py file,",
+                    "it will no longer be loaded. Please copy all relevant configuration to botconfig.yml.",
+                    "Please see comments in botconfig.yml or check https://ww.chat/config for help",
+                    "on how to configure lykos.",
+                ]
+            )
+        )
         sys.exit(1)
 
     general_logger = logging.getLogger("general")
@@ -107,21 +120,17 @@ def main():
         username = nick
 
     transport_name = config.Main.get("transports[0].name")
-    transport_logger = logging.getLogger("transport.{}".format(transport_name))
+    transport_logger = logging.getLogger(f"transport.{transport_name}")
     # this uses %-style formatting to ensure that our logger is capable of handling both styles
     transport_logger.info("Connecting to %s:%s%d", host, "+" if use_ssl else "", port)
-    cmd_handler = {
-        "privmsg": lambda *s: None,
-        "notice": lambda *s: None,
-        "": handler.unhandled
-    }
+    cmd_handler = {"privmsg": lambda *s: None, "notice": lambda *s: None, "": handler.unhandled}
 
     def stream_handler(msg, level="info"):
         level_map = {
             "debug": logging.DEBUG,
             "info": logging.INFO,
             "warning": logging.WARNING,
-            "error": logging.ERROR
+            "error": logging.ERROR,
         }
         transport_logger.log(level_map[level], msg)
 
@@ -146,11 +155,13 @@ def main():
         tokenbucket=TokenBucket(
             config.Main.get("transports[0].flood.max_burst"),
             config.Main.get("transports[0].flood.sustained_rate"),
-            init=config.Main.get("transports[0].flood.initial_burst")),
+            init=config.Main.get("transports[0].flood.initial_burst"),
+        ),
         connect_cb=handler.connect_callback,
         stream_handler=stream_handler,
     )
     cli.mainLoop()
+
 
 if __name__ == "__main__":
     try:

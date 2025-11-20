@@ -1,14 +1,24 @@
-from src.gamemodes import game_mode, GameMode, InvalidModeException
-from src.messages import messages
-from src import events, channels, users
+from src.gamemodes import GameMode, game_mode
+
 
 @game_mode("alpha", minp=10, maxp=24)
 class AlphaMode(GameMode):
     """Features the alpha wolf who can turn other people into wolves, be careful whom you trust!"""
+
     def __init__(self, arg=""):
         super().__init__(arg)
         self.ROLE_GUIDE = {
-            10: ["alpha wolf", "traitor", "oracle", "harlot", "doctor", "amnesiac", "lycan", "lycan(2)", "cursed villager"],
+            10: [
+                "alpha wolf",
+                "traitor",
+                "oracle",
+                "harlot",
+                "doctor",
+                "amnesiac",
+                "lycan",
+                "lycan(2)",
+                "cursed villager",
+            ],
             12: ["werecrow", "guardian angel"],
             13: ["vigilante", "mayor", "cursed villager(2)"],
             14: ["wolf"],

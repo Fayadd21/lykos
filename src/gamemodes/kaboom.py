@@ -1,15 +1,23 @@
 from src.events import EventListener
-from src.gamemodes import game_mode, GameMode
+from src.gamemodes import GameMode, game_mode
 from src.gamestate import GameState
 
 
 @game_mode("kaboom", minp=6, maxp=24)
 class KaboomMode(GameMode):
     """All of these explosions are rather loud..."""
+
     def __init__(self, arg=""):
         super().__init__(arg)
         self.ROLE_GUIDE = {
-            6: ["wolf", "crazed shaman", "mad scientist", "insomniac", "vengeful ghost", "blessed villager"],
+            6: [
+                "wolf",
+                "crazed shaman",
+                "mad scientist",
+                "insomniac",
+                "vengeful ghost",
+                "blessed villager",
+            ],
             7: ["master of teleportation"],
             8: ["wolf"],
             10: ["oracle", "mad scientist"],
@@ -23,13 +31,11 @@ class KaboomMode(GameMode):
             20: ["master of teleportation"],
             21: ["wolf"],
             22: ["mad scientist"],
-            23: ["vengeful ghost"]
+            23: ["vengeful ghost"],
         }
         self.SECONDARY_ROLES["blessed villager"] = {"wolf"}
         self.SECONDARY_ROLES["oracle"] = {"wolf"}
-        self.EVENTS = {
-            "role_attribution_end": EventListener(self.on_role_attribution_end)
-        }
+        self.EVENTS = {"role_attribution_end": EventListener(self.on_role_attribution_end)}
 
     def on_role_attribution_end(self, evt, var: GameState, main_roles, roles):
         # ensure the blessed wolf and the wolf oracle aren't the same wolf

@@ -1,17 +1,27 @@
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 
-from src.gamemodes import game_mode, GameMode
-from src.functions import get_players
-from src.gamestate import GameState
-from src.events import Event, EventListener
-from src.trans import chk_win_conditions
 from src import users
-from src.cats import All, Team_Switcher, Win_Stealer, Wolf, Wolf_Objective, Vampire_Objective, Killer
+from src.cats import (
+    All,
+    Killer,
+    Team_Switcher,
+    Vampire_Objective,
+    Win_Stealer,
+    Wolf,
+    Wolf_Objective,
+)
+from src.events import Event, EventListener
+from src.functions import get_players
+from src.gamemodes import GameMode, game_mode
+from src.gamestate import GameState
 from src.random import random
+from src.trans import chk_win_conditions
+
 
 @game_mode("maelstrom", minp=8, maxp=24)
 class MaelstromMode(GameMode):
     """Some people just want to watch the world burn."""
+
     def __init__(self, arg=""):
         super().__init__(arg)
         self.CUSTOM_SETTINGS.role_reveal = "on"
@@ -20,10 +30,16 @@ class MaelstromMode(GameMode):
         # clone and wild child are pointless in this mode
         # monster and demoniac are nearly impossible to counter and don't add any interesting gameplay
         # succubus keeps around entranced people, who are then unable to win even if there are later no succubi (not very fun)
-        self.roles = All - Team_Switcher - Win_Stealer + {"fool", "lycan", "turncoat"} - self.SECONDARY_ROLES.keys()
+        self.roles = (
+            All
+            - Team_Switcher
+            - Win_Stealer
+            + {"fool", "lycan", "turncoat"}
+            - self.SECONDARY_ROLES.keys()
+        )
         self.EVENTS = {
             "role_attribution": EventListener(self.role_attribution),
-            "transition_night_begin": EventListener(self.transition_night_begin)
+            "transition_night_begin": EventListener(self.transition_night_begin),
         }
 
     def role_attribution(self, evt: Event, var: GameState, villagers):
@@ -35,7 +51,7 @@ class MaelstromMode(GameMode):
         if var.night_count == 0:
             return
         villagers = get_players(var)
-        lpl = len(villagers)
+        len(villagers)
         addroles = self._role_attribution(var, villagers, False)
 
         # shameless copy/paste of regular role attribution
@@ -47,7 +63,9 @@ class MaelstromMode(GameMode):
         # (note that None doesn't work, so "player" works fine)
         for player in var.main_roles:
             var.main_roles[player] = "player"
-        new_evt = Event("new_role", {"messages": [], "role": None, "in_wolfchat": False}, inherit_from=None)
+        new_evt = Event(
+            "new_role", {"messages": [], "role": None, "in_wolfchat": False}, inherit_from=None
+        )
         for role, count in addroles.items():
             selected = random.sample(villagers, count)
             for x in selected:
@@ -78,7 +96,9 @@ class MaelstromMode(GameMode):
     def _role_attribution(self, var, villagers, do_templates):
         lpl = len(villagers)
         addroles = Counter()
-        addroles[random.choice(list(Wolf & Killer))] += 1 # make sure there's at least one wolf role
+        addroles[random.choice(list(Wolf & Killer))] += (
+            1  # make sure there's at least one wolf role
+        )
         num_wolves = 1
         num_vampires = 0
         roles = list(self.roles)

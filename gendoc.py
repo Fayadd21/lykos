@@ -1,21 +1,23 @@
 import copy
-from collections import OrderedDict, Counter
-from io import StringIO
-from pathlib import Path
-import sys
-from typing import Optional
-from requests import Session
 import hashlib
 import json
 import re
+import sys
+from collections import Counter, OrderedDict
+from io import StringIO
+from pathlib import Path
+
+from requests import Session
 from ruamel.yaml import YAML, RoundTripRepresenter, SafeRepresenter
 
+from src.cats import Category, all_cats, all_roles, role_order
 from src.config import Config, Empty, merge
 from src.gamemodes import GAME_MODES
-from src.cats import all_cats, all_roles, role_order, Category
+
 
 class Undefined:
     pass
+
 
 class CategoryEncoder(json.JSONEncoder):
     def default(self, o):
@@ -23,7 +25,9 @@ class CategoryEncoder(json.JSONEncoder):
             return str(o)
         return super().default(o)
 
+
 Conf = Config()
+
 
 def add_section(section, indent=2, path="", name=None):
     if not name:
@@ -40,6 +44,7 @@ def add_section(section, indent=2, path="", name=None):
     if indent == 2 or "_name" not in section:
         markup += add_values(section, indent=indent, path=path)
     return markup
+
 
 def add_values(section, indent, path):
     markup = ""
@@ -66,8 +71,10 @@ def add_values(section, indent, path):
         default = f'<code>"{default}"</code>'
     elif t == "bool":
         default = "<code>true</code>" if default else "<code>false</code>"
-    elif t in ("int", "float", "enum") or (isinstance(t, set) and t & {"int", "float", "enum"} == t):
-        default = f'<code>{default}</code>'
+    elif t in ("int", "float", "enum") or (
+        isinstance(t, set) and t & {"int", "float", "enum"} == t
+    ):
+        default = f"<code>{default}</code>"
     elif t == "list":
         if not default:
             default = "''(empty list)''"
@@ -93,7 +100,7 @@ def add_values(section, indent, path):
     if t == "dict":
         # Make subsections with the valid keys, in alphabetical order
         for key, value in sorted(section["_default"].items(), key=lambda x: x[0]):
-            markup += add_section(value, indent=indent+1, path=path, name=key)
+            markup += add_section(value, indent=indent + 1, path=path, name=key)
     elif t == "enum":
         # Make a list of the valid enum choices
         markup += "\n'''Allowed Values:'''\n"
@@ -102,12 +109,14 @@ def add_values(section, indent, path):
 
     return markup
 
+
 def yaml_dump(obj):
     with StringIO() as buffer:
         with YAML(output=buffer) as y:
             y.dump(obj)
         dump = buffer.getvalue()
-        return f"\n<syntaxhighlight lang=\"yaml\">{dump}</syntaxhighlight>\n"
+        return f'\n<syntaxhighlight lang="yaml">{dump}</syntaxhighlight>\n'
+
 
 def generate_config_page():
     # Initialize markup with our intro (as a template so we can easily edit it without needing to push code changes)
@@ -120,21 +129,21 @@ def generate_config_page():
         markup += add_section(Conf.metadata[key])
     return markup
 
+
 def generate_roles_page():
     obj = {
         "categories": {k: sorted(v.roles) for k, v in all_cats().items()},
         "order": list(role_order()),
-        "roles": all_roles()
+        "roles": all_roles(),
     }
 
     # pretty-print for easier human parsing
     # sort keys to ensure that page content remains stable between executions (as otherwise dict order is arbitrary)
     return json.dumps(obj, indent=2, sort_keys=True, cls=CategoryEncoder)
 
+
 def generate_gamemodes_page():
-    obj = {
-        "modes": {}
-    }
+    obj = {"modes": {}}
     total_likelihood = 0
     for mode, min_players, max_players in GAME_MODES.values():
         if mode.name in ("roles",):
@@ -148,12 +157,15 @@ def generate_gamemodes_page():
             "max": max_players,
             "likelihood": likelihood,
             "default role": default_role,
-            "defined counts": sorted(mode_inst.ROLE_GUIDE.keys())
+            "defined counts": sorted(mode_inst.ROLE_GUIDE.keys()),
         }
         c = Counter({default_role: min_players})
         seen_roles = set()
         set_only_roles = set()
-        strip = lambda x: re.sub(r"\(.*\)", "", x)
+
+        def strip(x):
+            return re.sub(r"\(.*\)", "", x)
+
         for role_defs in mode_inst.ROLE_GUIDE.values():
             seen_roles.update(strip(x) for x in role_defs if x[0] != "-")
         for role_set, set_roles in mode_inst.ROLE_SETS.items():
@@ -167,7 +179,9 @@ def generate_gamemodes_page():
                 continue
             c[role] = 0
 
-        exclude = set(mode_inst.SECONDARY_ROLES.keys()) | set(mode_inst.ROLE_SETS.keys()) | {default_role}
+        exclude = (
+            set(mode_inst.SECONDARY_ROLES.keys()) | set(mode_inst.ROLE_SETS.keys()) | {default_role}
+        )
         for i in range(min_players, max_players + 1):
             if i in mode_inst.ROLE_GUIDE:
                 for role in mode_inst.ROLE_GUIDE[i]:
@@ -181,7 +195,9 @@ def generate_gamemodes_page():
             role_guide[i] = {k: v for k, v in c.items()}
         mode_obj["role guide"] = role_guide
         secondary_roles = sorted(iter(mode_inst.SECONDARY_ROLES.keys() & seen_roles))
-        mode_obj["secondary roles"] = {r: str(mode_inst.SECONDARY_ROLES[r]) for r in secondary_roles}
+        mode_obj["secondary roles"] = {
+            r: str(mode_inst.SECONDARY_ROLES[r]) for r in secondary_roles
+        }
         mode_obj["role sets"] = {k: v for k, v in mode_inst.ROLE_SETS.items() if k in seen_roles}
         obj["modes"][mode.name] = mode_obj
 
@@ -190,6 +206,7 @@ def generate_gamemodes_page():
     obj["total likelihood"] = total_likelihood
 
     return json.dumps(obj, indent=2, sort_keys=True)
+
 
 def generate_docs(doc_type):
     if doc_type == "config":
@@ -202,12 +219,15 @@ def generate_docs(doc_type):
         print(f"Unknown documentation type {doc_type}")
         sys.exit(1)
 
-def wiki_api(session: Session,
-             url: str,
-             params: dict,
-             data: Optional[dict] = None,
-             method: Optional[str] = None,
-             assert_bot: Optional[str] = None):
+
+def wiki_api(
+    session: Session,
+    url: str,
+    params: dict,
+    data: dict | None = None,
+    method: str | None = None,
+    assert_bot: str | None = None,
+):
     method = method or ("POST" if data else "GET")
     params = copy.copy(params)
     params.update({"format": "json", "formatversion": 2})
@@ -221,23 +241,29 @@ def wiki_api(session: Session,
         sys.exit(1)
     return parsed
 
-def edit_page(session: Session,
-              url: str,
-              page: str,
-              text: str,
-              summary: str,
-              edit_token: str,
-              assert_bot: Optional[str] = None):
+
+def edit_page(
+    session: Session,
+    url: str,
+    page: str,
+    text: str,
+    summary: str,
+    edit_token: str,
+    assert_bot: str | None = None,
+):
     edit_params = {"action": "edit", "title": page}
     md5 = hashlib.md5()
     md5.update(text.encode("utf-8"))
-    edit_data = {"bot": 1,
-                 "nocreate": 1,
-                 "text": text,
-                 "summary": summary,
-                 "md5": md5.hexdigest(),
-                 "token": edit_token}
+    edit_data = {
+        "bot": 1,
+        "nocreate": 1,
+        "text": text,
+        "summary": summary,
+        "md5": md5.hexdigest(),
+        "token": edit_token,
+    }
     return wiki_api(session, url, edit_params, edit_data, assert_bot=assert_bot)
+
 
 if __name__ == "__main__":
     file = Path(__file__).parent / "src" / "defaultsettings.yml"
@@ -245,7 +271,9 @@ if __name__ == "__main__":
     # make sure we always print a literal null when dumping None values
     RoundTripRepresenter.add_representer(type(None), SafeRepresenter.represent_none)
     # emit an empty string if the default is undefined
-    RoundTripRepresenter.add_representer(Undefined, lambda r, d: r.represent_scalar("tag:yaml.org,2002:null", ""))
+    RoundTripRepresenter.add_representer(
+        Undefined, lambda r, d: r.represent_scalar("tag:yaml.org,2002:null", "")
+    )
     # omit !!omap tag from our OrderedDict dumps; we use ordering just to make things alphabetical
     RoundTripRepresenter.add_representer(OrderedDict, SafeRepresenter.represent_dict)
     if len(sys.argv) < 2 or sys.argv[1] == "-h" or sys.argv[1] == "--help":
@@ -271,16 +299,45 @@ if __name__ == "__main__":
                 sys.exit(1)
             username = login_result["login"]["lgusername"]
             token_params["type"] = "csrf"
-            csrf_token = wiki_api(s, api, token_params, assert_bot=username)["query"]["tokens"]["csrftoken"]
+            csrf_token = wiki_api(s, api, token_params, assert_bot=username)["query"]["tokens"][
+                "csrftoken"
+            ]
 
             print("Updating Configuration page...")
-            print(edit_page(s, api, "Configuration", generate_docs("config"),
-                            f"Configuration update from [[git:{commit}]]", csrf_token, assert_bot=username))
+            print(
+                edit_page(
+                    s,
+                    api,
+                    "Configuration",
+                    generate_docs("config"),
+                    f"Configuration update from [[git:{commit}]]",
+                    csrf_token,
+                    assert_bot=username,
+                )
+            )
 
             print("Updating Roles page...")
-            print(edit_page(s, api, "Module:Roles/data.json", generate_docs("roles"),
-                            f"Role data update from [[git:{commit}]]", csrf_token, assert_bot=username))
+            print(
+                edit_page(
+                    s,
+                    api,
+                    "Module:Roles/data.json",
+                    generate_docs("roles"),
+                    f"Role data update from [[git:{commit}]]",
+                    csrf_token,
+                    assert_bot=username,
+                )
+            )
 
             print("Updating Game modes page...")
-            print(edit_page(s, api, "Module:Gamemodes/data.json", generate_docs("gamemodes"),
-                            f"Game mode data update from [[git:{commit}]]", csrf_token, assert_bot=username))
+            print(
+                edit_page(
+                    s,
+                    api,
+                    "Module:Gamemodes/data.json",
+                    generate_docs("gamemodes"),
+                    f"Game mode data update from [[git:{commit}]]",
+                    csrf_token,
+                    assert_bot=username,
+                )
+            )

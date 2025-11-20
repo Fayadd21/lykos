@@ -12,13 +12,13 @@ import logging
 import sys
 from typing import Any
 
-from src.decorators import hook
+from src import channels, config, context, users
 from src.context import Features, NotLoggedIn
+from src.decorators import hook
 from src.events import Event, event_listener
 
-from src import config, context, channels, users
-
 _who_old: dict[str, users.User] = {}
+
 
 @hook("whoreply")
 def who_reply(cli, bot_server, bot_nick, chan, ident, host, server, nick, status, hopcount_gecos):
@@ -46,7 +46,7 @@ def who_reply(cli, bot_server, bot_nick, chan, ident, host, server, nick, status
     hop, realname = hopcount_gecos.split(" ", 1)
     # We throw away the information about the operness of the user, but we probably don't need to care about that
     # We also don't directly pass which modes they have, since that's already on the channel/user
-    is_away = ("G" in status)
+    is_away = "G" in status
 
     modes: set[str] = {Features.PREFIX.get(s, "") for s in status} - {""}
 
@@ -67,8 +67,25 @@ def who_reply(cli, bot_server, bot_nick, chan, ident, host, server, nick, status
     event = Event("who_result", {}, away=is_away, data=0, old=user)
     event.dispatch(ch, user)
 
+
 @hook("whospcrpl")
-def extended_who_reply(cli, bot_server, bot_nick, data, chan, ident, ip_address, host, server, nick, status, hop, idle, account, realname):
+def extended_who_reply(
+    cli,
+    bot_server,
+    bot_nick,
+    data,
+    chan,
+    ident,
+    ip_address,
+    host,
+    server,
+    nick,
+    status,
+    hop,
+    idle,
+    account,
+    realname,
+):
     """Handle WHOX responses for servers that support it.
 
     An extended WHO (WHOX) is characterised by a second parameter to the request
@@ -105,7 +122,7 @@ def extended_who_reply(cli, bot_server, bot_nick, data, chan, ident, ip_address,
     if account == "0":
         account = NotLoggedIn
 
-    is_away = ("G" in status)
+    is_away = "G" in status
 
     data = int.from_bytes(data.encode(Features["CHARSET"]), "little")
 
@@ -137,6 +154,7 @@ def extended_who_reply(cli, bot_server, bot_nick, data, chan, ident, ip_address,
     _who_old[new_user.nick] = user
     event = Event("who_result", {}, away=is_away, data=data, old=user)
     event.dispatch(ch, new_user)
+
 
 @hook("endofwho")
 def end_who(cli, bot_server, bot_nick, target, rest):
@@ -172,7 +190,9 @@ def end_who(cli, bot_server, bot_nick, target, rest):
     _who_old.clear()
     Event("who_end", {}, old=old).dispatch(target)
 
+
 _whois_pending: dict[str, dict[str, Any]] = {}
+
 
 @hook("whoisuser")
 def on_whois_user(cli, bot_server, bot_nick, nick, ident, host, sep, realname):
@@ -199,6 +219,7 @@ def on_whois_user(cli, bot_server, bot_nick, nick, ident, host, sep, realname):
         user = users.add(cli, nick=nick, ident=ident, host=host)
     _whois_pending[nick] = {"user": user, "account": None, "away": False, "channels": set()}
 
+
 @hook("whoisaccount")
 def on_whois_account(cli, bot_server, bot_nick, nick, account, logged):
     """Update the account of the user in a WHOIS reply.
@@ -218,6 +239,7 @@ def on_whois_account(cli, bot_server, bot_nick, nick, account, logged):
     """
 
     _whois_pending[nick]["account"] = account
+
 
 @hook("whoischannels")
 def on_whois_channels(cli, bot_server, bot_nick, nick, chans):
@@ -242,6 +264,7 @@ def on_whois_channels(cli, bot_server, bot_nick, nick, chans):
         if ch is not None:
             _whois_pending[nick]["channels"].add(ch)
 
+
 @hook("away")
 def on_away(cli, bot_server, bot_nick, nick, message):
     """Handle away replies for WHOIS.
@@ -264,6 +287,7 @@ def on_away(cli, bot_server, bot_nick, nick, message):
     if nick in _whois_pending:
         _whois_pending[nick]["away"] = True
 
+
 @hook("endofwhois")
 def on_whois_end(cli, bot_server, bot_nick, nick, message):
     """Handle the end of WHOIS and fire events.
@@ -285,7 +309,9 @@ def on_whois_end(cli, bot_server, bot_nick, nick, message):
     values = _whois_pending.pop(nick)
     # check for account change
     new_user = user = values["user"]
-    if {user.account, values["account"]} != {NotLoggedIn} and not context.equals(user.account, values["account"]):
+    if {user.account, values["account"]} != {NotLoggedIn} and not context.equals(
+        user.account, values["account"]
+    ):
         # first check tests if both are NotLoggedIn, and skips over this if so
         old_account = user.account
         user.account = values["account"]
@@ -296,6 +322,7 @@ def on_whois_end(cli, bot_server, bot_nick, nick, message):
     for chan in values["channels"]:
         event.dispatch(chan, new_user)
     Event("who_end", {}, old=user).dispatch(new_user)
+
 
 @hook("event_hosthidden")
 def host_hidden(cli, server, nick, host, message):
@@ -319,6 +346,7 @@ def host_hidden(cli, server, nick, host, message):
     if nick == users.Bot.nick:
         users.Bot.host = host
 
+
 @hook("loggedin")
 def on_loggedin(cli, server, nick, rawnick, account, message):
     """Update our own rawnick with proper info.
@@ -338,6 +366,7 @@ def on_loggedin(cli, server, nick, rawnick, account, message):
     # only trust it if we don't have ident/host data from elsewhere
     if users.Bot is None:
         from src import handler
+
         data = users.parse_rawnick_as_dict(rawnick)
         if handler._temp_ident is None:
             handler._temp_ident = data["ident"]
@@ -351,6 +380,7 @@ def on_loggedin(cli, server, nick, rawnick, account, message):
         if users.Bot.host is None:
             users.Bot.host = data["host"]
         users.Bot.account = account
+
 
 @hook("ping")
 def on_ping(cli, prefix, server):
@@ -366,6 +396,7 @@ def on_ping(cli, prefix, server):
 
     with cli:
         cli.send("PONG", server)
+
 
 @hook("featurelist")
 def get_features(cli, server, nick, *features):
@@ -393,6 +424,7 @@ def get_features(cli, server, nick, *features):
         else:
             Features.set(feature, "")
 
+
 @hook("channelmodeis")
 def current_modes(cli, server, bot_nick, chan, mode, *targets):
     """Update the channel modes with the existing ones.
@@ -410,6 +442,7 @@ def current_modes(cli, server, bot_nick, chan, mode, *targets):
 
     ch = channels.add(chan, cli)
     ch.update_modes(server, mode, targets)
+
 
 @hook("channelcreate")
 def chan_created(cli, server, bot_nick, chan, timestamp):
@@ -430,6 +463,7 @@ def chan_created(cli, server, bot_nick, chan, timestamp):
 
     channels.add(chan, cli).timestamp = int(timestamp)
 
+
 @hook("mode")
 def mode_change(cli, rawnick, chan, mode, *targets):
     """Update the channel and user modes whenever a mode change occurs.
@@ -447,7 +481,7 @@ def mode_change(cli, rawnick, chan, mode, *targets):
 
     """
 
-    if chan == users.Bot.nick: # we only see user modes set to ourselves
+    if chan == users.Bot.nick:  # we only see user modes set to ourselves
         users.Bot.modes.update(mode)
         return
 
@@ -464,11 +498,13 @@ def mode_change(cli, rawnick, chan, mode, *targets):
     target = channels.add(chan, cli)
     target.queue("mode_change", {"mode": mode, "targets": targets}, (actor, target))
 
-@event_listener("mode_change", 0) # This should fire before anything else!
+
+@event_listener("mode_change", 0)  # This should fire before anything else!
 def apply_mode_changes(evt, actor, target):
     """Apply all mode changes before any other event."""
 
     target.update_modes(actor, evt.data.pop("mode"), evt.data.pop("targets"))
+
 
 def handle_listmode(cli, chan, mode, target, setter, timestamp):
     """Handle and store list modes."""
@@ -477,6 +513,7 @@ def handle_listmode(cli, chan, mode, target, setter, timestamp):
     if mode not in ch.modes:
         ch.modes[mode] = {}
     ch.modes[mode][target] = (setter, int(timestamp))
+
 
 @hook("banlist")
 def check_banlist(cli, server, bot_nick, chan, target, setter, timestamp):
@@ -495,6 +532,7 @@ def check_banlist(cli, server, bot_nick, chan, target, setter, timestamp):
     """
 
     handle_listmode(cli, chan, "b", target, setter, timestamp)
+
 
 @hook("quietlist")
 def check_quietlist(cli, server, bot_nick, chan, mode, target, setter, timestamp):
@@ -515,6 +553,7 @@ def check_quietlist(cli, server, bot_nick, chan, mode, target, setter, timestamp
 
     handle_listmode(cli, chan, mode, target, setter, timestamp)
 
+
 @hook("exceptlist")
 def check_banexemptlist(cli, server, bot_nick, chan, target, setter, timestamp):
     """Update the channel ban exempt list with the current one.
@@ -532,6 +571,7 @@ def check_banexemptlist(cli, server, bot_nick, chan, target, setter, timestamp):
     """
 
     handle_listmode(cli, chan, "e", target, setter, timestamp)
+
 
 @hook("invitelist")
 def check_inviteexemptlist(cli, server, bot_nick, chan, target, setter, timestamp):
@@ -551,11 +591,13 @@ def check_inviteexemptlist(cli, server, bot_nick, chan, target, setter, timestam
 
     handle_listmode(cli, chan, "I", target, setter, timestamp)
 
+
 def handle_endlistmode(cli, chan, mode):
     """Handle the end of a list mode listing."""
 
     ch = channels.add(chan, cli)
     ch.queue("end_listmode", {}, (ch, mode))
+
 
 @hook("endofbanlist")
 def end_banlist(cli, server, bot_nick, chan, message):
@@ -572,6 +614,7 @@ def end_banlist(cli, server, bot_nick, chan, message):
     """
 
     handle_endlistmode(cli, chan, "b")
+
 
 @hook("quietlistend")
 def end_quietlist(cli, server, bot_nick, chan, mode, message=None):
@@ -595,6 +638,7 @@ def end_quietlist(cli, server, bot_nick, chan, mode, message=None):
 
     handle_endlistmode(cli, chan, mode)
 
+
 @hook("endofexceptlist")
 def end_banexemptlist(cli, server, bot_nick, chan, message):
     """Handle the end of the ban exempt list.
@@ -611,6 +655,7 @@ def end_banexemptlist(cli, server, bot_nick, chan, message):
 
     handle_endlistmode(cli, chan, "e")
 
+
 @hook("endofinvitelist")
 def end_inviteexemptlist(cli, server, bot_nick, chan, message):
     """Handle the end of the invite exempt list.
@@ -626,6 +671,7 @@ def end_inviteexemptlist(cli, server, bot_nick, chan, message):
     """
 
     handle_endlistmode(cli, chan, "I")
+
 
 @hook("nick")
 def on_nick_change(cli, old_rawnick, nick):
@@ -645,6 +691,7 @@ def on_nick_change(cli, old_rawnick, nick):
     new_user = users.get(nick, user.ident, user.host, user.account, allow_bot=True)
 
     Event("nick_change", {}, old=user).dispatch(new_user, old_nick)
+
 
 @hook("account")
 def on_account_change(cli, rawnick, account):
@@ -666,6 +713,7 @@ def on_account_change(cli, rawnick, account):
     new_user = users.get(user.nick, user.ident, user.host, account, allow_bot=True)
 
     Event("account_change", {}, old=user).dispatch(new_user, old_account)
+
 
 @hook("join")
 def join_chan(cli, rawnick, chan, account=None, realname=None):
@@ -694,7 +742,14 @@ def join_chan(cli, rawnick, chan, account=None, realname=None):
 
     ch = channels.add(chan, cli)
 
-    user = users.get(nick=rawnick, account=account, allow_bot=True, allow_none=True, allow_ghosts=True, update=True)
+    user = users.get(
+        nick=rawnick,
+        account=account,
+        allow_bot=True,
+        allow_none=True,
+        allow_ghosts=True,
+        update=True,
+    )
     if user is None:
         user = users.add(cli, nick=rawnick, account=account)
     if account:
@@ -714,6 +769,7 @@ def join_chan(cli, rawnick, chan, account=None, realname=None):
         ch.mode()
         ch.mode(Features["CHANMODES"][0])
         ch.who()
+
 
 @hook("part")
 def part_chan(cli, rawnick, chan, reason=""):
@@ -735,10 +791,11 @@ def part_chan(cli, rawnick, chan, reason=""):
     user = users.get(rawnick, allow_bot=True, update=True)
     Event("chan_part", {}).dispatch(ch, user, reason)
 
-    if user is users.Bot: # oh snap! we're no longer in the channel!
+    if user is users.Bot:  # oh snap! we're no longer in the channel!
         ch.clear()
     else:
         ch.remove_user(user)
+
 
 @hook("kick")
 def kicked_from_chan(cli, rawnick, chan, target, reason):
@@ -764,6 +821,7 @@ def kicked_from_chan(cli, rawnick, chan, target, reason):
     else:
         ch.remove_user(user)
 
+
 def quit(context, message=""):
     """Quit the bot from IRC."""
 
@@ -771,12 +829,13 @@ def quit(context, message=""):
 
     if cli is None or cli.socket.fileno() < 0:
         transport_name = config.Main.get("transports[0].name")
-        logger = logging.getLogger("transport.{}".format(transport_name))
+        logger = logging.getLogger(f"transport.{transport_name}")
         logger.warning("Socket is already closed. Exiting.")
         sys.exit(0)
 
     with cli:
-        cli.send("QUIT :{0}".format(message))
+        cli.send(f"QUIT :{message}")
+
 
 @hook("quit")
 def on_quit(cli, rawnick, reason):
@@ -801,6 +860,7 @@ def on_quit(cli, rawnick, reason):
         else:
             chan.remove_user(user)
 
+
 @hook("chghost")
 def on_chghost(cli, rawnick, ident, host):
     """Handle a user changing host without a quit.
@@ -818,7 +878,7 @@ def on_chghost(cli, rawnick, ident, host):
     old_ident = user.ident
     old_host = user.host
     # we avoid multiple swaps if we change the rawnick instead of ident and host separately
-    new_rawnick = "{0}!{1}@{2}".format(user.nick, ident, host)
+    new_rawnick = f"{user.nick}!{ident}@{host}"
     user.rawnick = new_rawnick
     new_user = users.get(new_rawnick, allow_bot=True)
 

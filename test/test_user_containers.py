@@ -1,7 +1,9 @@
 from unittest import TestCase
-from src.containers import UserSet, UserDict, UserList, DefaultUserDict
+
 from src import users
-from src.users import FakeUser, BotUser
+from src.containers import UserSet
+from src.users import BotUser, FakeUser
+
 
 class TestUserContainers(TestCase):
     @classmethod

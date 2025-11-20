@@ -1,7 +1,7 @@
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
 import os
 import random as py_random
-from typing import Optional
+
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
 
 __all__ = ["random", "seed_function", "get_seed"]
 # seed_function must be a function accepting an int and returning a bytestring containing that many random bytes
@@ -12,9 +12,11 @@ KEY_SIZE = 32
 NONCE_SIZE = 16
 BUFFER_SIZE = 1024
 
+
 def get_seed():
     """Retrieve a seed suitable for passing to random.seed()."""
     return seed_function(KEY_SIZE)
+
 
 class GameRNG(py_random.Random):
     """A better RNG than default random while providing the same API.
@@ -27,6 +29,7 @@ class GameRNG(py_random.Random):
     This is not secure for any sort of cryptographic use; it is purely to
     provide a better RNG for gameplay purposes.
     """
+
     def __init__(self, seed=None):
         self._cur: bytes = b""
         self._next: bytes = b""
@@ -51,7 +54,7 @@ class GameRNG(py_random.Random):
         self._next = self._buffer[0:KEY_SIZE]
         self._offset = offset
 
-    def seed(self, a: Optional[bytes] = None, version: int = 2) -> None:
+    def seed(self, a: bytes | None = None, version: int = 2) -> None:
         if a is None:
             self._cur = self._next = seed_function(KEY_SIZE)
         elif not isinstance(a, bytes):
@@ -78,7 +81,7 @@ class GameRNG(py_random.Random):
         # and updated to use self.randbytes instead of urandom
         # python floats are doubles, and doubles have 53 bits for the significand
         # we don't want to populate exponent with any random data or else we massively bias results
-        return (int.from_bytes(self.randbytes(7)) >> 3) * (2 ** -53)
+        return (int.from_bytes(self.randbytes(7)) >> 3) * (2**-53)
 
     def randbytes(self, n) -> bytes:
         if n < 0:
@@ -91,11 +94,11 @@ class GameRNG(py_random.Random):
         while n > 0:
             remaining = BUFFER_SIZE - self._offset
             if remaining > n:
-                buf[i:i + n] = self._buffer[self._offset:self._offset + n]
+                buf[i : i + n] = self._buffer[self._offset : self._offset + n]
                 self._offset += n
                 break
             else:
-                buf[i:i + remaining] = self._buffer[self._offset:]
+                buf[i : i + remaining] = self._buffer[self._offset :]
                 n -= remaining
                 i += remaining
                 self._reseed()
@@ -109,6 +112,7 @@ class GameRNG(py_random.Random):
         self._buffer = enc.update(b"\x00" * BUFFER_SIZE)
         self._next = self._buffer[0:KEY_SIZE]
         self._offset = KEY_SIZE
+
 
 # named so things can do `from src.random import random` and use all of the `random.blah()` APIs without change
 random = GameRNG()

@@ -2,17 +2,20 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Callable
 from types import SimpleNamespace
-from typing import Callable, Optional, Any
+from typing import Any
+
 from src.debug import handle_error
 
 __all__ = ["find_listener", "event_listener", "Event", "EventListener"]
 EVENT_CALLBACKS: dict[str, list[EventListener]] = defaultdict(list)
 
+
 class EventListener:
     # because type checker is dumb...
     # noinspection PyUnresolvedReferences
-    def __init__(self, callback: Callable, *, listener_id: Optional[str] = None, priority: float = 5):
+    def __init__(self, callback: Callable, *, listener_id: str | None = None, priority: float = 5):
         if listener_id is not None:
             self._id = listener_id
         elif callback.__module__ is not None:
@@ -24,7 +27,7 @@ class EventListener:
 
     def install(self, event: str):
         if self in EVENT_CALLBACKS[event]:
-            raise ValueError("Callback with id {} already registered for the {} event".format(self.id, event))
+            raise ValueError(f"Callback with id {self.id} already registered for the {event} event")
         EVENT_CALLBACKS[event].append(self)
 
     def remove(self, event: str):
@@ -50,19 +53,21 @@ class EventListener:
     def id(self, value):
         raise ValueError("Cannot modify id attribute")
 
+
 def find_listener(event: str, listener_id: str) -> EventListener:
     for evt in EVENT_CALLBACKS[event]:
         if evt.id == listener_id:
             return evt
-    raise Exception("Could not find listener with id {0}".format(listener_id))
+    raise Exception(f"Could not find listener with id {listener_id}")
+
 
 class event_listener:
     def __init__(self, event, priority=5, listener_id=None):
         self.event = event
         self.priority = priority
-        self.func: Optional[Callable] = None
+        self.func: Callable | None = None
         self.listener_id = listener_id
-        self.listener: Optional[EventListener] = None
+        self.listener: EventListener | None = None
 
     def __call__(self, *args, **kwargs):
         if self.func is None:
@@ -75,7 +80,9 @@ class event_listener:
                 if func.__module__ is not None:
                     self.listener_id = func.__module__ + "." + self.listener_id
             self.func = handle_error(func)
-            self.listener = EventListener(self.func, priority=self.priority, listener_id=self.listener_id)
+            self.listener = EventListener(
+                self.func, priority=self.priority, listener_id=self.listener_id
+            )
             self.listener.install(self.event)
             self.__doc__ = self.func.__doc__
             return self
@@ -87,6 +94,7 @@ class event_listener:
 
     def remove(self):
         self.listener.remove(self.event)
+
 
 class Event:
     def __init__(self, _name: str, _data: dict[str, Any], **kwargs):

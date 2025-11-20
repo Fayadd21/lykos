@@ -1,29 +1,29 @@
 from __future__ import annotations
 
+import re
+import sys
+import time
 from collections import Counter
 from datetime import datetime, timedelta
-from typing import Optional
-import time
-import sys
-import re
 
-from src.decorators import command
+from src import channels, config, pregame, trans, users
+from src.cats import Vampire_Team, Wolfteam, all_teams, role_order
 from src.containers import UserDict
-from src.functions import get_players, get_main_role
-from src.messages import messages
-from src.events import Event, EventListener, event_listener
-from src.cats import Wolfteam, Neutral, role_order, Vampire_Team, all_teams
-from src import config, users, channels, pregame, trans
+from src.decorators import command
 from src.dispatcher import MessageDispatcher
+from src.events import Event, EventListener, event_listener
+from src.functions import get_main_role, get_players
 from src.gamestate import GameState
+from src.messages import messages
 from src.users import User
 
-LAST_STATS: Optional[datetime] = None
-LAST_TIME: Optional[datetime] = None
-LAST_ADMINS: Optional[datetime] = None
+LAST_STATS: datetime | None = None
+LAST_TIME: datetime | None = None
+LAST_ADMINS: datetime | None = None
 LAST_GOAT: UserDict[User, datetime] = UserDict()
 
 ADMIN_PINGING: bool = False
+
 
 @command("stats", pm=True)
 def stats(wrapper: MessageDispatcher, message: str):
@@ -37,7 +37,10 @@ def stats(wrapper: MessageDispatcher, message: str):
 
     if wrapper.public and (wrapper.source in pl or var.current_phase == "join"):
         # only do this rate-limiting stuff if the person is in game
-        if LAST_STATS and LAST_STATS + timedelta(seconds=config.Main.get("ratelimits.stats")) > datetime.now():
+        if (
+            LAST_STATS
+            and LAST_STATS + timedelta(seconds=config.Main.get("ratelimits.stats")) > datetime.now()
+        ):
             wrapper.pm(messages["command_ratelimited"])
             return
 
@@ -49,14 +52,28 @@ def stats(wrapper: MessageDispatcher, message: str):
             player_role = get_main_role(var, wrapper.source)
         except ValueError:
             pass
-    if wrapper.private and var.in_game and player_role in Wolfteam and "src.roles.helper.wolves" in sys.modules:
+    if (
+        wrapper.private
+        and var.in_game
+        and player_role in Wolfteam
+        and "src.roles.helper.wolves" in sys.modules
+    ):
         from src.roles.helper.wolves import get_wolflist
+
         msg = messages["players_list_count"].format(
-            len(pl), get_wolflist(var, wrapper.source, shuffle=False, remove_player=False))
-    elif wrapper.private and var.in_game and player_role in Vampire_Team and "src.roles.vampire" in sys.modules:
+            len(pl), get_wolflist(var, wrapper.source, shuffle=False, remove_player=False)
+        )
+    elif (
+        wrapper.private
+        and var.in_game
+        and player_role in Vampire_Team
+        and "src.roles.vampire" in sys.modules
+    ):
         from src.roles.vampire import get_vampire_list
+
         msg = messages["players_list_count"].format(
-            len(pl), get_vampire_list(var, wrapper.source, shuffle=False, remove_player=False))
+            len(pl), get_vampire_list(var, wrapper.source, shuffle=False, remove_player=False)
+        )
     else:
         msg = messages["players_list_count"].format(len(pl), pl)
 
@@ -117,7 +134,7 @@ def stats(wrapper: MessageDispatcher, message: str):
     elif var.stats_type == "accurate":
         l1 = [k for k in var.roles if var.roles[k]]
         l2 = [k for k in var.original_roles if var.original_roles[k]]
-        rs = set(l1+l2)
+        rs = set(l1 + l2)
         rs = [role for role in role_order() if role in rs]
 
         # picky ordering: villager always last
@@ -168,10 +185,12 @@ def stats(wrapper: MessageDispatcher, message: str):
 
     wrapper.reply(messages["stats_reply"].format(var.current_phase, first_count, entries))
 
+
 @event_listener("reconfigure_stats")
 def on_reconfigure_stats(evt: Event, var: GameState, roleset: Counter, reason: str):
     global LAST_STATS
     LAST_STATS = None
+
 
 @command("time", pm=True)
 def timeleft(wrapper: MessageDispatcher, message: str):
@@ -182,7 +201,10 @@ def timeleft(wrapper: MessageDispatcher, message: str):
         return
 
     if wrapper.public:
-        if LAST_TIME and LAST_TIME + timedelta(seconds=config.Main.get("ratelimits.time")) > datetime.now():
+        if (
+            LAST_TIME
+            and LAST_TIME + timedelta(seconds=config.Main.get("ratelimits.time")) > datetime.now()
+        ):
             wrapper.pm(messages["command_ratelimited"].format())
             return
 
@@ -195,7 +217,7 @@ def timeleft(wrapper: MessageDispatcher, message: str):
 
     if var.current_phase in trans.TIMERS or f"{var.current_phase}_limit" in trans.TIMERS:
         if var.current_phase == "day":
-            what = "sunset" # FIXME: hardcoded english
+            what = "sunset"  # FIXME: hardcoded english
             name = "day_limit"
         elif var.current_phase == "night":
             what = "sunrise"
@@ -205,24 +227,34 @@ def timeleft(wrapper: MessageDispatcher, message: str):
             name = "join"
         else:
             what = "the end of the phase"
-            name = var.current_phase if var.current_phase in trans.TIMERS else f"{var.current_phase}_limit"
+            name = (
+                var.current_phase
+                if var.current_phase in trans.TIMERS
+                else f"{var.current_phase}_limit"
+            )
 
         remaining = int((trans.TIMERS[name][1] + trans.TIMERS[name][2]) - time.time())
-        msg = "There is \u0002{0[0]:0>2}:{0[1]:0>2}\u0002 remaining until {1}.".format(divmod(remaining, 60), what)
+        msg = "There is \u0002{0[0]:0>2}:{0[1]:0>2}\u0002 remaining until {1}.".format(
+            divmod(remaining, 60), what
+        )
     else:
         msg = messages["timers_disabled"].format(var.current_phase.capitalize())
 
     wrapper.reply(msg)
 
+
 @command("admins", pm=True)
 def show_admins(wrapper: MessageDispatcher, message: str):
     """Pings the admins that are available."""
     global LAST_ADMINS, ADMIN_PINGING
-    var = wrapper.game_state
     admins = []
 
     if wrapper.public:
-        if LAST_ADMINS and LAST_ADMINS + timedelta(seconds=config.Main.get("ratelimits.admins")) > datetime.now():
+        if (
+            LAST_ADMINS
+            and LAST_ADMINS + timedelta(seconds=config.Main.get("ratelimits.admins"))
+            > datetime.now()
+        ):
             wrapper.pm(messages["command_ratelimited"])
             return
 
@@ -258,12 +290,16 @@ def show_admins(wrapper: MessageDispatcher, message: str):
 
     channels.Main.who()
 
+
 @command("goat")
 def goat(wrapper: MessageDispatcher, message: str):
     """Use a goat to interact with anyone in the channel during the day."""
-    var = wrapper.game_state
 
-    if wrapper.source in LAST_GOAT and LAST_GOAT[wrapper.source] + timedelta(seconds=config.Main.get("ratelimits.goat")) > datetime.now():
+    if (
+        wrapper.source in LAST_GOAT
+        and LAST_GOAT[wrapper.source] + timedelta(seconds=config.Main.get("ratelimits.goat"))
+        > datetime.now()
+    ):
         wrapper.pm(messages["command_ratelimited"])
         return
     target = re.split(" +", message)[0]
@@ -278,11 +314,12 @@ def goat(wrapper: MessageDispatcher, message: str):
     LAST_GOAT[wrapper.source] = datetime.now()
     wrapper.send(messages["goat_success"].format(wrapper.source, victim.get()))
 
+
 @command("fgoat", flag="j")
 def fgoat(wrapper: MessageDispatcher, message: str):
     """Forces a goat to interact with anyone or anything, without limitations."""
 
-    nick = message.split(' ')[0].strip()
+    nick = message.split(" ")[0].strip()
     victim = users.complete_match(users.lower(nick), wrapper.target.users)
     if victim:
         togoat = victim.get()
@@ -291,9 +328,11 @@ def fgoat(wrapper: MessageDispatcher, message: str):
 
     wrapper.send(messages["goat_success"].format(wrapper.source, togoat))
 
+
 @event_listener("begin_day")
 def on_begin_day(evt: Event, var: GameState):
     LAST_GOAT.clear()
+
 
 @event_listener("reset")
 def on_reset(evt: Event, var: GameState):
