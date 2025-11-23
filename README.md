@@ -62,6 +62,59 @@ dist/
 
 ---
 
+## For developers
+
+### Static Code Analysis
+
+This project uses [Ruff](https://docs.astral.sh/ruff/) for static code analysis. Ruff is already included in the development dependencies.
+
+#### Running Static Code Analysis
+
+To run Ruff manually:
+
+```bash
+poetry run ruff check .
+```
+
+To automatically fix issues where possible:
+
+```bash
+poetry run ruff check --fix .
+```
+
+To format code:
+
+```bash
+poetry run ruff format .
+```
+
+#### Pre-commit Hooks
+
+Pre-commit hooks automatically run Ruff before each commit to ensure code quality.
+
+**Setting up pre-commit hooks:**
+
+1. Install pre-commit (already included in dev dependencies):
+   ```bash
+   poetry install
+   ```
+
+2. Install the git hooks:
+   ```bash
+   poetry run pre-commit install
+   ```
+
+3. (Optional) Run hooks on all files:
+   ```bash
+   poetry run pre-commit run --all-files
+   ```
+
+Once installed, the hooks will automatically run Ruff when you commit. If Ruff finds issues, the commit will be blocked until you fix them. Ruff will also attempt to automatically fix issues where possible.
+
+The pre-commit configuration is in `.pre-commit-config.yaml`.
+
+---
+
 ## For players
 
 ### I've never played such a game before. How do I play?
