@@ -26,7 +26,7 @@ Lykos now uses [**Poetry**](https://python-poetry.org/) for dependency managemen
 
 ### 1. Clone and enter the project
 ```bash
-git clone https://github.com/lykoss/lykos.git
+git clone https://github.com/Fayadd21/lykos.git
 cd lykos
 ```
 
@@ -156,7 +156,7 @@ Special thanks to LaneAtomic for their work on the messages system, which made c
 ---
 
 [mafia]: https://en.wikipedia.org/wiki/Mafia_(party_game)
-[license]: https://github.com/lykoss/lykos/blob/master/LICENSE
+[license]: https://github.com/Fayadd21/lykos/blob/Poetry-Init/LICENSE
 [game_webchat]: https://web.libera.chat/?channels=#werewolf
 [wikinet]: https://werewolf.chat/Networks
 [wiki]: https://werewolf.chat/Main_Page
