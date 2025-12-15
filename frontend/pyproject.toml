@@ -1,0 +1,13 @@
+[tool.poetry]
+name = "lykos-frontend"
+version = "0.1.0"
+description = "Web dashboard for Lykos bot"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+flask = "^3.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+

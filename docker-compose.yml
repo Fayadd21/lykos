@@ -1,0 +1,22 @@
+services:
+  backend:
+    build: .
+    container_name: lykos-bot
+    volumes:
+      - ./botconfig.yml:/app/botconfig.yml
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: lykos-web
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock  # so frontend can check if backend is running
+    depends_on:
+      - backend
+    restart: unless-stopped

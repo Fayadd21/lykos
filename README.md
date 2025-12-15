@@ -16,6 +16,49 @@ We run an instance of the bot in the [#werewolf channel][game_webchat] on Libera
 
 ---
 
+## Running with Docker
+
+If you want to run the bot without installing Python or Poetry, you can use Docker. Docker will automatically handle all dependencies inside containers, so you don't need to install anything on your computer except Docker itself. This setup includes both the IRC bot and a simple web dashboard to monitor its status.
+
+### What you need
+
+- Docker Desktop installed on your machine
+
+### How to run it
+
+First, copy the example config file and edit it with your IRC server details:
+
+```bash
+cp botconfig.example.yml botconfig.yml
+```
+
+Open `botconfig.yml` in a text editor and change these settings:
+- Bot nickname (line 27)
+- IRC channel name (line 30)
+- Your account name (line 59)
+
+Once that's done, start everything with:
+
+```bash
+docker-compose up --build
+```
+
+The first time you run this, Docker will download Python, install all dependencies, and build the containers automatically. This takes a few minutes but you only need to do it once. After that, the bot will connect to your IRC server and you can view its status by opening http://localhost:8080 in your browser.
+
+To stop the bot, press Ctrl+C in the terminal. If you want to run it in the background instead, use:
+
+```bash
+docker-compose up -d
+```
+
+And to stop it when running in the background:
+
+```bash
+docker-compose down
+```
+
+---
+
 ## Build, Installation, and Setup (using Poetry)
 
 Lykos now uses [**Poetry**](https://python-poetry.org/) for dependency management, packaging, and builds.  
