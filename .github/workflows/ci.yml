@@ -2,11 +2,7 @@ name: Continuous Integration
 
 on:
   push:
-    branches:
-      - master
   pull_request:
-    branches:
-      - master
 
 jobs:
   unittest:
@@ -16,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest ]
-        python: [ 3.11, 3.12 ]
+        python: [ 3.11, 3.12, 3.13 ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,5 +28,112 @@ jobs:
           poetry install --no-interaction --no-root
       - name: Unit Tests
         run: |
-          python -m unittest discover -v -s test -t .
+          poetry run python -m unittest discover -v -s test -t .
+
+  analysis:
+    name: Code Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+      - name: Install dependencies
+        run: |
+          poetry install --no-interaction --no-root
+      - name: Run Ruff
+        run: |
+          poetry run ruff check .
+      - name: Check formatting
+        run: |
+          poetry run ruff format --check .
+      - name: Check for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    name: Create Release
+    needs: [unittest, analysis]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Install dependencies
+        run: |
+          poetry install --no-interaction --no-root
+
+      - name: Build package
+        run: |
+          poetry build
+
+      - name: Generate changelog from git history
+        run: |
+          # try to find the previous tag; if none, we just use all history
+          last_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$last_tag" ]; then
+            echo "First release, including all commits" > CHANGELOG_RELEASE.md
+            git log --pretty=format:"- %s" >> CHANGELOG_RELEASE.md
+          else
+            echo "Changes since $last_tag:" > CHANGELOG_RELEASE.md
+            git log "$last_tag"..HEAD --pretty=format:"- %s" >> CHANGELOG_RELEASE.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: CHANGELOG_RELEASE.md
+          files: |
+            dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docs:
+    name: Publish docs
+    needs: [unittest, analysis]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Install dependencies (for docs)
+        run: |
+          poetry install --no-interaction --no-root
+
+      - name: Build Sphinx docs
+        run: |
+          poetry run sphinx-build -b html docs/source docs/build/html
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/build/html
 
